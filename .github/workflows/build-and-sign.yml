@@ -1,7 +1,8 @@
 name: build-and-sign
 
-# Builds the Windows client on a GitHub-hosted runner, tests it, attests the archive's provenance and,
-# on a v* tag, publishes a GitHub Release.
+# Builds the Windows client on a GitHub-hosted runner, tests it and attests the archive's provenance.
+# Publishing a GitHub Release (tag v*) runs it and attaches the archive and its SHA-256 to that release;
+# pushing a v* tag creates the release itself.
 #
 # Authenticode signing goes through SignPath Foundation (free for open source). It turns on by itself
 # once the repository variables SIGNPATH_ORGANIZATION_ID and SIGNPATH_PROJECT_SLUG and the secret
@@ -11,6 +12,8 @@ name: build-and-sign
 # engine afterwards would break the pin.
 
 on:
+  release:
+    types: [published]
   push:
     tags: ['v*']
   workflow_dispatch:
@@ -153,7 +156,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          $tag = $env:GITHUB_REF_NAME
+          $version = $tag.TrimStart('v')
           # Release notes: the CHANGELOG section of this version.
           $lines = Get-Content CHANGELOG.md -Encoding UTF8
           $start = [Array]::FindIndex($lines, [Predicate[string]]{ param($l) $l -like "## $version*" })
@@ -165,4 +169,10 @@ jobs:
           $signedNote = if ($env:SIGNPATH_ENABLED -eq 'true') { 'Netlane.exe и движок подписаны SignPath Foundation.' } else { 'Исполняемые файлы пока без подписи Authenticode: подпись SignPath Foundation появится после одобрения заявки.' }
           $notes += "`n`n$signedNote`n`nПроверка происхождения архива: ``gh attestation verify Netlane-windows-x64.zip --repo $env:GITHUB_REPOSITORY``"
           Set-Content release-notes.md $notes -Encoding UTF8
-          gh release create $env:GITHUB_REF_NAME dist/Netlane-windows-x64.zip dist/Netlane-windows-x64.zip.sha256 --title "Netlane $version" --notes-file release-notes.md
+          $assets = @('dist/Netlane-windows-x64.zip', 'dist/Netlane-windows-x64.zip.sha256')
+          if ($env:GITHUB_EVENT_NAME -eq 'release') {
+            gh release upload $tag @assets --clobber
+            gh release edit $tag --title "Netlane $version" --notes-file release-notes.md
+          } else {
+            gh release create $tag @assets --title "Netlane $version" --notes-file release-notes.md
+          }
