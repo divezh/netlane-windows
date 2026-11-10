@@ -181,9 +181,9 @@ namespace Netlane {
             homePage = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Ground, Padding = new Padding(24, 16, 24, 8) };
 
             // Hero of the left column: the state large and centred, the one big action, the session line.
-            topRow = new TableLayoutPanel { Dock = DockStyle.Top, Height = 176, ColumnCount = 1, RowCount = 4, Margin = new Padding(0), BackColor = Theme.Ground };
+            topRow = new TableLayoutPanel { Dock = DockStyle.Top, Height = 202, ColumnCount = 1, RowCount = 4, Margin = new Padding(0), BackColor = Theme.Ground };
             topRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            foreach (int height in new[] { 66, 54, 26, 30 }) topRow.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
+            foreach (int height in new[] { 78, 72, 26, 26 }) topRow.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
             statusBlock.TitleSize = 20f; statusBlock.AlignLeft = false; statusBlock.Dock = DockStyle.Fill; statusBlock.Margin = new Padding(0, 8, 0, 0);
             connectButton.Dock = DockStyle.None; connectButton.Anchor = AnchorStyles.None; connectButton.Size = new Size(240, 44); connectButton.Margin = new Padding(0);
             connectButton.Font = Theme.Font(Theme.BodySize + 1f, true); connectButton.ForeColor = Theme.Ink;

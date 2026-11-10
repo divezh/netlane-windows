@@ -39,7 +39,7 @@ namespace Netlane {
                 TextRenderer.DrawText(g, title, bold, new Rectangle(left + dot + gap, top, Math.Max(0, Width - left - dot - gap), bold.Height), ink,
                     TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
                 if (subtitle.Length > 0) {
-                    int subTop = top + bold.Height + (int)Theme.Px(g, 1);
+                    int subTop = top + bold.Height + (int)Theme.Px(g, TitleSize > 15f ? 6 : 1);
                     TextRenderer.DrawText(g, subtitle, small, new Rectangle(AlignLeft ? left : 0, subTop, Width - (AlignLeft ? left : 0), small.Height), AlignLeft ? Theme.Muted : Theme.Faint,
                         (AlignLeft ? TextFormatFlags.Left : TextFormatFlags.HorizontalCenter) | TextFormatFlags.Top | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
                 }
