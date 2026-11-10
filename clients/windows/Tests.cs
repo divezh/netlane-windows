@@ -125,7 +125,8 @@ namespace Netlane {
                 Check(all.Any(c=>c is Label&&c.Visible&&c.Text=="↑ 210,0 МБ")&&all.Any(c=>c is Label&&c.Visible&&c.Text=="↓ 1,8 ГБ"),"Connected: sent and received in the session rows.");
                 LocationsTable table=(LocationsTable)all.First(c=>c is LocationsTable);
                 Check(table.Visible&&table.RowCount==2&&table.SelectedName=="Амстердам","Two locations: both are rows of the table: "+table.RowCount);
-                Check(all.Any(c=>c is LinkLabel&&c.Visible&&c.Text=="Проверить пинг")&&all.Any(c=>c is LinkLabel&&c.Visible&&c.Text=="Добавить ссылку…"),"Ping check and adding a server sit under the table.");
+                Check(!all.Any(c=>c is LinkLabel&&c.Visible&&(c.Text=="Проверить пинг"||c.Text=="Добавить ссылку…")),"Ping check and adding live in the table, not as links under it.");
+                Check(table.AddRowBounds.Bottom<=table.Height&&table.RefreshBounds.Right<=table.Width,"The add row and the refresh glyph fit the table: "+table.AddRowBounds+" / "+table.RefreshBounds);
                 Check(f.Size.Width==920&&f.Size.Height==560,"Default window is 920 × 560: "+f.Size);
                 List<NavItem> items=all.OfType<NavItem>().Where(c=>c.Visible).ToList();
                 Check(items.Count==MainForm.NavIds.Length&&items.Single(c=>c.Selected).Text=="Подключение","Navigation: six pages, «Подключение» first: "+items.Count);
@@ -168,6 +169,9 @@ namespace Netlane {
                 Check(action.Kind==ButtonKind.Primary,"Idle: the action is the primary «Подключиться».");
                 Check(all.OfType<StatusBlock>().Any(c=>c.Visible&&c.Title=="Не подключено"),"Idle status.");
                 Check(!all.Any(c=>c is Label&&c.Visible&&(c.Text.StartsWith("↓ ")||c.Text.StartsWith("↑ "))),"Idle: no traffic in the session rows.");
+                SpeedGraph lanes=new SpeedGraph(); lanes.Push(2048,100); lanes.Push(4096,300);
+                Check(lanes.SampleCount==2&&lanes.Peak==4096&&lanes.UpPeak==300&&lanes.Last(true)==300&&lanes.Last(false)==4096,"Speed lanes keep receive and send apart.");
+                lanes.Dispose();
             }
             using (MainForm f=new MainForm(true,null,ConnectionView.Idle)) {
                 f.Show();Application.DoEvents();
@@ -177,6 +181,10 @@ namespace Netlane {
                 Check(pickedId==f.State.Servers[1].Id,"A click on a row picks that location.");
                 Pump(f.CheckPings());
                 Check(table.PingFor(0)=="31 мс"&&f.PingsForTests.Count==2&&f.PingsForTests[f.State.Servers[1].Id]=="нет ответа","Ping check measures every server and updates the table.");
+                Check(!table.Checking&&f.PingNoteForTests=="Пинг проверен только что","After a ping check the note under the table says when: "+f.PingNoteForTests);
+                int pingAsks=0,addAsks=0; table.PingRequested+=delegate{pingAsks++;}; table.AddRequested+=delegate{addAsks++;};
+                table.RequestPing(); table.RequestAdd(); table.Checking=true; table.RequestPing(); table.Checking=false;
+                Check(pingAsks==1&&addAsks==1,"The refresh glyph and the add row raise their actions; a running check ignores another: "+pingAsks+"/"+addAsks);
                 string error=f.PasteLink("not a link");Check(error=="В буфере обмена нет ссылки tt:// или ссылки подписки.","«Вставить» without a link explains: "+error);
             }
             using (MainForm f=new MainForm(true,"no-servers",null)) {

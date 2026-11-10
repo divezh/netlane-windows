@@ -10,19 +10,29 @@ using System.Windows.Forms;
 namespace Netlane {
     // «Подключение»: locations as a plain table — flag, name, transport and ping. One click switches;
     // arrows move the keyboard row and Enter picks it. More rows than fit scroll with the wheel.
+    // The table carries its own two actions: a refresh glyph in the «Пинг» header checks every server,
+    // and a dashed last row adds a subscription or a server.
     internal sealed class LocationsTable : ThemedControl {
+        internal const string AddText = "Добавить подписку или сервер";
         readonly List<Server> servers = new List<Server>();
         Dictionary<string, string> pings = new Dictionary<string, string>();
+        readonly ToolTip tip = new ToolTip { InitialDelay = 400 };
+        readonly Timer spin = new Timer { Interval = 50 };
         string selectedId;
         int hoverRow = -1, keyRow = -1, first;
-        float scale = 1f;
+        bool hoverRefresh, checking, pingEnabled = true;
+        float scale = 1f, spinAngle;
         internal event Action<string> Picked;
-        internal LocationsTable() { AccessibleRole = AccessibleRole.List; AccessibleName = "Локации"; Cursor = Cursors.Default; }
+        internal event Action PingRequested, AddRequested;
+        internal LocationsTable() {
+            AccessibleRole = AccessibleRole.List; AccessibleName = "Локации"; Cursor = Cursors.Default;
+            spin.Tick += delegate { spinAngle = (spinAngle + 24) % 360; Invalidate(RefreshBounds); };
+        }
 
         internal void SetServers(IEnumerable<Server> items, string selected, Dictionary<string, string> pingMap) {
             servers.Clear(); servers.AddRange(items);
             selectedId = selected; pings = pingMap ?? new Dictionary<string, string>();
-            if (keyRow >= servers.Count) keyRow = -1;
+            if (keyRow > servers.Count) keyRow = -1;
             ClampScroll();
             Invalidate();
         }
@@ -30,27 +40,44 @@ namespace Netlane {
         internal string SelectedName { get { Server s = servers.FirstOrDefault(x => x.Id == selectedId); return s == null ? null : s.Name; } }
         internal string PingFor(int row) { string ping; return row >= 0 && row < servers.Count && pings.TryGetValue(servers[row].Id, out ping) ? ping : null; }
         internal void PickRow(int row) { if (row < 0 || row >= servers.Count || !Enabled) return; Action<string> handler = Picked; if (handler != null) handler(servers[row].Id); }
+        // The refresh glyph turns while every server is being pinged and ignores clicks then.
+        internal bool Checking { get { return checking; } set { if (checking == value) return; checking = value; if (value) spin.Start(); else { spin.Stop(); spinAngle = 0; } Invalidate(); } }
+        internal bool PingEnabled { get { return pingEnabled; } set { if (pingEnabled == value) return; pingEnabled = value; Invalidate(); } }
+        internal void RequestPing() { if (!Enabled || !pingEnabled || checking) return; Action handler = PingRequested; if (handler != null) handler(); }
+        internal void RequestAdd() { if (!Enabled) return; Action handler = AddRequested; if (handler != null) handler(); }
+        internal Rectangle RefreshBounds { get { int size = (int)(22 * scale); return new Rectangle(Width - (int)(12 * scale) - size + (int)(5 * scale), (HeaderHeight - size) / 2, size, size); } }
+        internal Rectangle AddRowBounds { get { return RowBounds(servers.Count); } }
 
+        // Servers and then the add row.
+        int Total { get { return servers.Count + 1; } }
         int HeaderHeight { get { return (int)(28 * scale); } }
         int RowHeight { get { return (int)(36 * scale); } }
         int VisibleRows { get { return Math.Max(1, (Height - HeaderHeight - (int)(4 * scale)) / Math.Max(1, RowHeight)); } }
-        void ClampScroll() { first = Math.Max(0, Math.Min(first, servers.Count - VisibleRows)); }
+        void ClampScroll() { first = Math.Max(0, Math.Min(first, Total - VisibleRows)); }
         internal Rectangle RowBounds(int row) { return new Rectangle(0, HeaderHeight + (int)(4 * scale) + (row - first) * RowHeight, Width, RowHeight - (int)(2 * scale)); }
         int RowAt(Point point) {
             if (point.Y < HeaderHeight + (int)(4 * scale)) return -1;
             int row = first + (point.Y - HeaderHeight - (int)(4 * scale)) / Math.Max(1, RowHeight);
-            return row < servers.Count && row < first + VisibleRows ? row : -1;
+            return row < Total && row < first + VisibleRows ? row : -1;
         }
 
         protected override void OnMouseMove(MouseEventArgs args) {
             int row = RowAt(args.Location);
-            if (row != hoverRow) { hoverRow = row; Cursor = row >= 0 ? Cursors.Hand : Cursors.Default; Invalidate(); }
+            bool overRefresh = RefreshBounds.Contains(args.Location);
+            if (row != hoverRow || overRefresh != hoverRefresh) {
+                if (overRefresh != hoverRefresh) tip.SetToolTip(this, overRefresh ? (checking ? "Проверяю пинг…" : "Проверить пинг всех серверов") : "");
+                hoverRow = row; hoverRefresh = overRefresh;
+                Cursor = row >= 0 || (overRefresh && pingEnabled && !checking) ? Cursors.Hand : Cursors.Default; Invalidate();
+            }
             base.OnMouseMove(args);
         }
-        protected override void OnMouseLeave(EventArgs args) { hoverRow = -1; base.OnMouseLeave(args); }
+        protected override void OnMouseLeave(EventArgs args) { hoverRow = -1; hoverRefresh = false; tip.SetToolTip(this, ""); base.OnMouseLeave(args); }
         protected override void OnMouseDown(MouseEventArgs args) { Focus(); base.OnMouseDown(args); }
         protected override void OnMouseClick(MouseEventArgs args) {
-            if (args.Button == MouseButtons.Left) { int row = RowAt(args.Location); if (row >= 0) { keyRow = row; PickRow(row); } }
+            if (args.Button == MouseButtons.Left) {
+                if (RefreshBounds.Contains(args.Location)) RequestPing();
+                else { int row = RowAt(args.Location); if (row >= 0) { keyRow = row; if (row == servers.Count) RequestAdd(); else PickRow(row); } }
+            }
             base.OnMouseClick(args);
         }
         protected override void OnMouseWheel(MouseEventArgs args) {
@@ -61,17 +88,18 @@ namespace Netlane {
         protected override bool IsInputKey(Keys keyData) { return keyData == Keys.Up || keyData == Keys.Down || base.IsInputKey(keyData); }
         protected override void OnKeyDown(KeyEventArgs args) {
             if (args.KeyCode == Keys.Up || args.KeyCode == Keys.Down) {
-                if (servers.Count == 0) return;
                 if (keyRow < 0) keyRow = Math.Max(0, servers.FindIndex(x => x.Id == selectedId));
-                else keyRow = Math.Max(0, Math.Min(servers.Count - 1, keyRow + (args.KeyCode == Keys.Down ? 1 : -1)));
+                else keyRow = Math.Max(0, Math.Min(Total - 1, keyRow + (args.KeyCode == Keys.Down ? 1 : -1)));
                 if (keyRow < first) first = keyRow; else if (keyRow >= first + VisibleRows) first = keyRow - VisibleRows + 1;
                 Invalidate(); args.Handled = true; return;
             }
-            if (args.KeyCode == Keys.Enter && keyRow >= 0) { PickRow(keyRow); args.Handled = true; return; }
+            if (args.KeyCode == Keys.Enter && keyRow >= 0) { Activate(keyRow); args.Handled = true; return; }
+            if (args.KeyCode == Keys.F5) { RequestPing(); args.Handled = true; return; }
             base.OnKeyDown(args);
         }
+        void Activate(int row) { if (row == servers.Count) RequestAdd(); else PickRow(row); }
         // Space and Enter on the control itself do nothing without a keyboard row.
-        protected override void OnKeyUp(KeyEventArgs args) { if (args.KeyCode == Keys.Space && keyRow >= 0) { PickRow(keyRow); args.Handled = true; } }
+        protected override void OnKeyUp(KeyEventArgs args) { if (args.KeyCode == Keys.Space && keyRow >= 0) { Activate(keyRow); args.Handled = true; } }
 
         protected override void OnPaint(PaintEventArgs args) {
             Graphics g = Prepare(args);
@@ -80,18 +108,19 @@ namespace Netlane {
             TextFormatFlags flags = TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding;
             using (Font caption = Theme.Font(Theme.CaptionSize)) using (Font body = Theme.Font(Theme.BodySize + 0.5f)) using (Font bold = Theme.Font(Theme.BodySize + 0.5f, true)) using (Font small = Theme.Font(Theme.SmallSize)) {
                 Rectangle head = new Rectangle(0, 0, Width, HeaderHeight);
+                Rectangle refresh = RefreshBounds;
                 TextRenderer.DrawText(g, "Локация", caption, new Rectangle(pad, 0, Width - 2 * pad - pingWidth - transportWidth, head.Height), Theme.Faint, flags | TextFormatFlags.Left);
                 TextRenderer.DrawText(g, "Транспорт", caption, new Rectangle(Width - pad - pingWidth - transportWidth, 0, transportWidth, head.Height), Theme.Faint, flags | TextFormatFlags.Left);
-                TextRenderer.DrawText(g, "Пинг", caption, new Rectangle(Width - pad - pingWidth, 0, pingWidth, head.Height), Theme.Faint, flags | TextFormatFlags.Right);
+                TextRenderer.DrawText(g, "Пинг", caption, new Rectangle(Width - pad - pingWidth, 0, refresh.Left - (int)(4 * scale) - (Width - pad - pingWidth), head.Height), Theme.Faint, flags | TextFormatFlags.Right);
+                bool live = Enabled && pingEnabled;
+                if (hoverRefresh && live && !checking) using (GraphicsPath path = Shapes.Round(refresh, 6 * scale)) using (Brush fill = new SolidBrush(Theme.Raised)) g.FillPath(fill, path);
+                DrawRefresh(g, refresh, checking ? Theme.Accent : live ? (hoverRefresh ? Theme.Accent : Theme.Muted) : Theme.Faint, checking ? spinAngle : 0);
                 using (Pen line = new Pen(Theme.Line)) g.DrawLine(line, 0, head.Bottom - 1, Width, head.Bottom - 1);
-                if (servers.Count == 0) {
-                    TextRenderer.DrawText(g, "Серверов пока нет.", body, new Rectangle(pad, head.Bottom + (int)(8 * scale), Width - 2 * pad, RowHeight), Theme.Faint, flags | TextFormatFlags.Left);
-                    return;
-                }
-                int last = Math.Min(servers.Count, first + VisibleRows);
+                int last = Math.Min(Total, first + VisibleRows);
                 for (int row = first; row < last; row++) {
-                    Server server = servers[row];
                     Rectangle box = RowBounds(row);
+                    if (row == servers.Count) { DrawAddRow(g, box, body, row == hoverRow && Enabled, row == keyRow && ShowFocus); continue; }
+                    Server server = servers[row];
                     bool selected = server.Id == selectedId, hot = row == hoverRow && Enabled;
                     if (selected || hot) using (GraphicsPath path = Shapes.Round(new RectangleF(box.X + .5f, box.Y + .5f, box.Width - 1, box.Height - 1), 5 * scale)) using (Brush fill = new SolidBrush(selected ? Theme.Selection : Theme.Card)) g.FillPath(fill, path);
                     if (row == keyRow && ShowFocus) using (GraphicsPath path = Shapes.Round(new RectangleF(box.X + .5f, box.Y + .5f, box.Width - 1, box.Height - 1), 5 * scale)) using (Pen edge = new Pen(Theme.Accent)) g.DrawPath(edge, path);
@@ -105,13 +134,39 @@ namespace Netlane {
                     TextRenderer.DrawText(g, String.IsNullOrEmpty(ping) ? "—" : ping, body, new Rectangle(Width - pad - pingWidth, box.Y, pingWidth, box.Height), ping == "нет ответа" ? Theme.Warning : ink, flags | TextFormatFlags.Right);
                 }
                 // A thin rail on the right edge says there is more than fits.
-                if (servers.Count > VisibleRows) {
-                    float track = VisibleRows * RowHeight, thumb = Math.Max(18 * scale, track * VisibleRows / servers.Count);
-                    float y = HeaderHeight + 4 * scale + (track - thumb) * first / Math.Max(1, servers.Count - VisibleRows);
+                if (Total > VisibleRows) {
+                    float track = VisibleRows * RowHeight, thumb = Math.Max(18 * scale, track * VisibleRows / Total);
+                    float y = HeaderHeight + 4 * scale + (track - thumb) * first / Math.Max(1, Total - VisibleRows);
                     using (Brush fill = new SolidBrush(Theme.LineStrong)) g.FillRectangle(fill, Width - 3 * scale, y, 2 * scale, thumb);
                 }
             }
         }
+        void DrawAddRow(Graphics g, Rectangle box, Font font, bool hot, bool focus) {
+            RectangleF frame = new RectangleF(box.X + .5f, box.Y + 3 * scale, box.Width - 1, box.Height - 4 * scale);
+            using (GraphicsPath path = Shapes.Round(frame, 6 * scale)) {
+                if (hot) using (Brush fill = new SolidBrush(Theme.Card)) g.FillPath(fill, path);
+                using (Pen edge = new Pen(focus || hot ? Theme.Accent : Theme.LineStrong, scale) { DashStyle = focus ? DashStyle.Solid : DashStyle.Dash }) g.DrawPath(edge, path);
+            }
+            Size text = TextRenderer.MeasureText(g, AddText, font, Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
+            float plus = 10 * scale, gap = 7 * scale, width = plus + gap + text.Width;
+            float left = frame.X + (frame.Width - width) / 2, cy = frame.Y + frame.Height / 2;
+            using (Pen pen = new Pen(Enabled ? Theme.Accent : Theme.Faint, 1.6f * scale) { StartCap = LineCap.Round, EndCap = LineCap.Round }) {
+                g.DrawLine(pen, left, cy, left + plus, cy); g.DrawLine(pen, left + plus / 2, cy - plus / 2, left + plus / 2, cy + plus / 2);
+            }
+            TextRenderer.DrawText(g, AddText, font, new Rectangle((int)(left + plus + gap), (int)frame.Y, text.Width + 2, (int)frame.Height), !Enabled ? Theme.Faint : hot ? Theme.Ink : Theme.Muted, TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
+        }
+        // Circular arrow: a 290° arc with a head at its end, turned by angle while checking.
+        void DrawRefresh(Graphics g, Rectangle box, Color color, float angle) {
+            float r = 5.5f * scale, cx = box.X + box.Width / 2f, cy = box.Y + box.Height / 2f, start = angle - 60, sweep = 290;
+            using (Pen pen = new Pen(color, 1.5f * scale) { StartCap = LineCap.Round, EndCap = LineCap.Round }) g.DrawArc(pen, cx - r, cy - r, 2 * r, 2 * r, start, sweep);
+            double e = (start + sweep) * Math.PI / 180;
+            PointF end = new PointF(cx + r * (float)Math.Cos(e), cy + r * (float)Math.Sin(e));
+            PointF tangent = new PointF(-(float)Math.Sin(e), (float)Math.Cos(e)), radial = new PointF((float)Math.Cos(e), (float)Math.Sin(e));
+            float head = 2.6f * scale;
+            PointF[] tri = { new PointF(end.X + tangent.X * head * 1.3f, end.Y + tangent.Y * head * 1.3f), new PointF(end.X + radial.X * head, end.Y + radial.Y * head), new PointF(end.X - radial.X * head, end.Y - radial.Y * head) };
+            using (Brush fill = new SolidBrush(color)) g.FillPolygon(fill, tri);
+        }
+        protected override void Dispose(bool disposing) { if (disposing) { spin.Dispose(); tip.Dispose(); } base.Dispose(disposing); }
     }
 
     // A bare 38 × 20 switch for a table row: the caption stands beside it as a label.

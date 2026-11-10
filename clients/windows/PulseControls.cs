@@ -74,50 +74,65 @@ namespace Netlane {
     }
 
     // Last 60 seconds of download speed: the answer to "is the tunnel alive?" without opening graphs.
+    // Two lanes over the last minute: receiving on top, sending below, each with its own label,
+    // current rate and scale, so a small upload is not flattened by a large download.
     internal sealed class SpeedGraph : ThemedControl {
-        readonly double[] samples = new double[60];
+        const int Window = 60;
+        readonly double[] down = new double[Window], up = new double[Window];
         int count, head;
-        double peak;
+        double peak, upPeak;
         internal int SampleCount { get { return count; } }
         internal double Peak { get { return peak; } }
+        internal double UpPeak { get { return upPeak; } }
         internal SpeedGraph() { TabStop = false; Cursor = Cursors.Default; }
-        internal void Push(double bytesPerSecond) {
-            if (bytesPerSecond < 0) bytesPerSecond = 0;
-            samples[head] = bytesPerSecond; head = (head + 1) % samples.Length;
-            if (count < samples.Length) count++;
-            if (bytesPerSecond > peak) peak = bytesPerSecond;
+        internal void Push(double receive, double send) {
+            receive = Math.Max(0, receive); send = Math.Max(0, send);
+            down[head] = receive; up[head] = send; head = (head + 1) % Window;
+            if (count < Window) count++;
+            if (receive > peak) peak = receive;
+            if (send > upPeak) upPeak = send;
             Invalidate();
         }
-        internal void Reset() { count = 0; head = 0; peak = 0; Invalidate(); }
-        double SampleAt(int index) { return samples[(head - count + index + samples.Length * 2) % samples.Length]; }
+        internal void Reset() { count = 0; head = 0; peak = upPeak = 0; Invalidate(); }
+        double At(double[] lane, int index) { return lane[(head - count + index + Window * 2) % Window]; }
+        internal double Last(bool send) { return count == 0 ? 0 : At(send ? up : down, count - 1); }
+
         protected override void OnPaint(PaintEventArgs args) {
             Graphics g = Prepare(args);
-            if (count < 2) {
-                using (Pen idle = new Pen(Theme.Line)) g.DrawLine(idle, 0, Height - 1, Width, Height - 1);
-                return;
+            float s = g.DpiX / 96f, gap = 8 * s, laneHeight = (Height - gap) / 2f;
+            DrawLane(g, new RectangleF(0, 0, Width, laneHeight), "Приём", "↓ ", down, Theme.Accent, s);
+            DrawLane(g, new RectangleF(0, laneHeight + gap, Width, laneHeight), "Отдача", "↑ ", up, Theme.Upload, s);
+        }
+        void DrawLane(Graphics g, RectangleF box, string title, string arrow, double[] lane, Color color, float s) {
+            float label = 17 * s;
+            TextFormatFlags flags = TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding;
+            Rectangle labelBox = new Rectangle((int)box.X, (int)box.Y, (int)box.Width, (int)label);
+            using (Font font = Theme.Font(Theme.SmallSize)) {
+                TextRenderer.DrawText(g, title, font, labelBox, Theme.Muted, flags | TextFormatFlags.Left);
+                TextRenderer.DrawText(g, count == 0 ? "—" : arrow + SessionStats.FormatRate(At(lane, count - 1)), font, labelBox, count == 0 ? Theme.Faint : color, flags | TextFormatFlags.Right);
             }
-            double max = Math.Max(peak * 1.18, 256 * 1024);
-            float top = 2, bottom = Math.Max(top + 1, Height - 2);
+            float top = box.Y + label + 3 * s, bottom = box.Bottom - 1;
+            using (Pen baseLine = new Pen(Theme.Line)) g.DrawLine(baseLine, box.X, bottom, box.Right, bottom);
+            if (count < 2) return;
+            double max = 16 * 1024;
+            for (int i = 0; i < count; i++) max = Math.Max(max, At(lane, i) * 1.15);
+            float right = box.Right - 4 * s;
             PointF[] points = new PointF[count];
             for (int i = 0; i < count; i++) {
-                double value = SampleAt(i);
-                float x = (float)(Width - 2) * i / (samples.Length - 1);
-                float y = (float)(bottom - (bottom - top) * Math.Min(1, value / max));
-                points[i] = new PointF(x, y);
+                float x = right - (right - box.X) * (count - 1 - i) / (Window - 1);
+                points[i] = new PointF(x, (float)(bottom - (bottom - top) * Math.Min(1, At(lane, i) / max)));
             }
-            GraphicsPath area = new GraphicsPath();
-            area.AddLine(points[0].X, bottom, points[0].X, points[0].Y);
-            area.AddLines(points);
-            area.AddLine(points[count - 1].X, points[count - 1].Y, points[count - 1].X, bottom);
-            area.CloseFigure();
-            using (LinearGradientBrush fill = new LinearGradientBrush(new Rectangle(0, 0, Math.Max(1, Width), Math.Max(1, Height)),
-                Color.FromArgb(70, Theme.Accent.R, Theme.Accent.G, Theme.Accent.B), Color.FromArgb(0, Theme.Accent.R, Theme.Accent.G, Theme.Accent.B), LinearGradientMode.Vertical))
-                g.FillPath(fill, area);
-            area.Dispose();
-            using (Pen line = new Pen(Theme.Accent, Theme.Px(g, 1.4f)) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round })
-                g.DrawLines(line, points);
-            using (Brush dot = new SolidBrush(Theme.Accent))
-                g.FillEllipse(dot, points[count - 1].X - Theme.Px(g, 2), points[count - 1].Y - Theme.Px(g, 2), Theme.Px(g, 4), Theme.Px(g, 4));
+            using (GraphicsPath area = new GraphicsPath()) {
+                area.AddLine(points[0].X, bottom, points[0].X, points[0].Y);
+                area.AddCurve(points, 0.4f);
+                area.AddLine(points[count - 1].X, points[count - 1].Y, points[count - 1].X, bottom);
+                area.CloseFigure();
+                using (Brush fill = new SolidBrush(Color.FromArgb(36, color))) g.FillPath(fill, area);
+            }
+            using (Pen line = new Pen(color, 1.5f * s) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round }) g.DrawCurve(line, points, 0.4f);
+            PointF now = points[count - 1];
+            using (Brush halo = new SolidBrush(Color.FromArgb(60, color))) g.FillEllipse(halo, now.X - 4 * s, now.Y - 4 * s, 8 * s, 8 * s);
+            using (Brush dot = new SolidBrush(color)) g.FillEllipse(dot, now.X - 2.2f * s, now.Y - 2.2f * s, 4.4f * s, 4.4f * s);
         }
     }
 

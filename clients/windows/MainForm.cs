@@ -22,7 +22,7 @@ namespace Netlane {
         // Account and feed line at the bottom of the navigation; a click refreshes the subscription.
         readonly SubscriptionRow subscriptionRow = new SubscriptionRow { Dock = DockStyle.Bottom, Height = 54, Margin = new Padding(0) };
         readonly StatusBlock statusBlock = new StatusBlock { Dock = DockStyle.Fill, Margin = new Padding(0), AlignLeft = true };
-        readonly SpeedGraph speedGraph = new SpeedGraph { Dock = DockStyle.Top, Height = 52, Margin = new Padding(0) };
+        readonly SpeedGraph speedGraph = new SpeedGraph { Dock = DockStyle.Top, Height = 92, Margin = new Padding(0) };
         readonly LocationsTable table = new LocationsTable { Dock = DockStyle.Fill, Margin = new Padding(0) };
         readonly TryCard tryCard = new TryCard { Dock = DockStyle.Top, Height = 104, Margin = new Padding(0) };
         readonly LogPreview logPreview = new LogPreview { Dock = DockStyle.Top, Height = 96, Margin = new Padding(0) };
@@ -37,7 +37,10 @@ namespace Netlane {
         readonly Label errorDetail = TextLabel("", Theme.BodySize, Theme.Muted), emptyTitle = TextLabel("", 20f, Theme.Ink), emptySub = TextLabel("", Theme.BodySize, Theme.Muted), emptyHint = TextLabel("Один сервер по ссылке tt:// тоже подойдёт", Theme.CaptionSize, Theme.Faint);
         readonly DarkButton transportButton = (DarkButton)Button("Сменить транспорт…", false), emptyPrimary = (DarkButton)Button("Вставить ссылку", true), emptySecondary = (DarkButton)Button("Открыть файл TOML…", false);
         readonly DarkButton setButton = (DarkButton)Button("", false);
-        readonly LinkLabel pingLink = ActionLink("Проверить пинг"), addLink = ActionLink("Добавить ссылку…");
+        // When every server was last pinged, under the table; the actions themselves live in the table.
+        readonly Label pingNote = TextLabel("", Theme.CaptionSize, Theme.Faint);
+        readonly Timer pingNoteTimer = new Timer { Interval = 30 * 1000 };
+        DateTime lastPingCheck = DateTime.MinValue;
         readonly MiniSwitch killSwitch = new MiniSwitch { Anchor = AnchorStyles.Right, Margin = new Padding(0), AccessibleName = "Kill Switch" };
         bool refreshingKill;
         string currentPage = "home";
@@ -173,8 +176,8 @@ namespace Netlane {
 
             // Left column: the locations table and two quiet actions under it.
             Panel locationsPane = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Ground, Margin = new Padding(0) };
-            FlowLayoutPanel links = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 28, WrapContents = false, BackColor = Theme.Ground, Margin = new Padding(0), Padding = new Padding(8, 4, 0, 0) };
-            links.Controls.Add(pingLink); links.Controls.Add(addLink);
+            Panel links = new Panel { Dock = DockStyle.Bottom, Height = 24, BackColor = Theme.Ground, Margin = new Padding(0), Padding = new Padding(12, 2, 0, 0) };
+            pingNote.Dock = DockStyle.Fill; links.Controls.Add(pingNote);
             locationsPane.Controls.Add(table); locationsPane.Controls.Add(links);
 
             // Right column: the session, then the route and protection of the next connection.
@@ -188,8 +191,8 @@ namespace Netlane {
             setButton.AccessibleName = "Набор правил";
             Control[] session = {
                 SectionCaption("Сессия"), Spacer(4),
-                Pair("Время", clock, 24, 190), Pair("Принято", received, 24, 190), Pair("Отправлено", sent, 24, 190), Pair("Скорость", speed, 24, 190),
-                Spacer(6), speedGraph, graphFoot, Spacer(12),
+                Pair("Время", clock, 24, 190), Pair("Принято", received, 24, 190), Pair("Отправлено", sent, 24, 190),
+                Spacer(8), speedGraph, graphFoot, Spacer(12),
                 SectionCaption("Маршрут и защита"), Spacer(4),
                 Pair("Набор правил", setButton, 36, 160), Pair("DNS", dnsValue, 30, 160), Pair("Kill Switch", killSwitch, 30, 60)
             };
@@ -247,8 +250,9 @@ namespace Netlane {
             transportButton.Click += delegate { OpenSettings("servers"); };
             emptyPrimary.Click += delegate { if (!previewOnly) PasteFromClipboard(); };
             emptySecondary.Click += delegate { if (!previewOnly) ImportFile(); };
-            pingLink.LinkClicked += async delegate { if (!previewOnly) await CheckPings(); };
-            addLink.LinkClicked += delegate { if (!previewOnly) ImportLink(); };
+            table.PingRequested += async delegate { if (!previewOnly) await CheckPings(); };
+            table.AddRequested += delegate { if (!previewOnly) ImportLink(); };
+            pingNoteTimer.Tick += delegate { RefreshPingNote(); }; pingNoteTimer.Start();
             dropZone.PickRequested += delegate { if (!previewOnly) PasteFromClipboard(); };
             logPreview.CopyRequested += delegate { CopyEngineLog(); };
             table.Picked += delegate(string id) { if (!previewOnly) SwitchTo(id, null); };
@@ -597,7 +601,7 @@ namespace Netlane {
         internal Dictionary<string, string> PingsForTests { get { return pings; } }
         internal async Task CheckPings() {
             if (checkingPings) return;
-            checkingPings = true; pingLink.Enabled = false;
+            checkingPings = true; table.Checking = true;
             foreach (Server item in VisibleLocations) pings[item.Id] = "…";
             RefreshPings();
             try {
@@ -605,10 +609,16 @@ namespace Netlane {
                     try { pings[server.Id] = await PingProbe(server); } catch (Exception error) { EngineLog.Write("ping " + server.Hostname + ": " + error.Message); pings[server.Id] = "нет ответа"; }
                 }));
                 if (IsDisposed) return;
-                latencyGeneration++; lastProbe = DateTime.UtcNow;
+                latencyGeneration++; lastProbe = lastPingCheck = DateTime.UtcNow; RefreshPingNote();
                 if (Selected != null) { pings.TryGetValue(Selected.Id, out pingText); RefreshPings(); }
-            } finally { checkingPings = false; if (!IsDisposed) pingLink.Enabled = true; }
+            } finally { checkingPings = false; if (!IsDisposed) table.Checking = false; }
         }
+        void RefreshPingNote() {
+            if (lastPingCheck == DateTime.MinValue) { pingNote.Text = ""; return; }
+            double age = (DateTime.UtcNow - lastPingCheck).TotalSeconds;
+            pingNote.Text = "Пинг проверен " + (age < 60 ? "только что" : age < 3600 ? ((int)(age / 60)) + " мин назад" : age < 86400 ? ((int)(age / 3600)) + " ч назад" : lastPingCheck.ToLocalTime().ToString("dd.MM HH:mm"));
+        }
+        internal string PingNoteForTests { get { return pingNote.Text; } }
         async Task ProbeLatency() {
             Server server = Selected;
             if (measuring || server == null || previewOnly) return;
@@ -761,10 +771,11 @@ namespace Netlane {
             clock.Text = SessionStats.FormatDuration(DateTime.UtcNow - connectedAt);
             sent.Text = hasTraffic ? "↑ " + SessionStats.FormatBytes(up) : Blank; received.Text = hasTraffic ? "↓ " + SessionStats.FormatBytes(down) : Blank;
             speed.Text = hasTraffic ? SessionStats.SpeedLine(downRate, upRate) : Blank;
-            if (hasTraffic) speedGraph.Push(downRate);
-            graphPeak.Text = speedGraph.Peak > 0 ? "пик " + SessionStats.FormatRate(speedGraph.Peak) : "";
+            if (hasTraffic) speedGraph.Push(downRate, upRate);
+            graphPeak.Text = PeakLine();
             tips.SetToolTip(speed, hasTraffic ? "" : "Скорость недоступна: нет данных счётчика VPN.");
         }
+        string PeakLine() { return speedGraph.Peak > 0 || speedGraph.UpPeak > 0 ? "пик ↓ " + SessionStats.FormatRate(speedGraph.Peak) + " · ↑ " + SessionStats.FormatRate(speedGraph.UpPeak) : ""; }
         // What a session row shows while there is nothing to show.
         const string Blank = "—";
         // Once a second: the reconnect countdown, or the session line while connected (only then).
@@ -864,7 +875,7 @@ namespace Netlane {
                     ApplyView(preview, null, "");
                     clock.Text = "00:42:17"; sent.Text = "↑ " + SessionStats.FormatBytes(220200960); received.Text = "↓ " + SessionStats.FormatBytes(1932735283);
                     speed.Text = SessionStats.SpeedLine(2.4 * 1024 * 1024, 210 * 1024);
-                    SeedGraph(); graphPeak.Text = "пик " + SessionStats.FormatRate(speedGraph.Peak);
+                    SeedGraph(); graphPeak.Text = PeakLine(); lastPingCheck = DateTime.UtcNow.AddMinutes(-2); RefreshPingNote();
                     pingText = "53 мс"; if (Selected != null) pings[Selected.Id] = pingText; RefreshPings(); break;
                 case ConnectionView.Reconnecting: ApplyView(preview, null, "Переподключение: попытка 2 через 5 с"); break;
                 case ConnectionView.KillSwitch: ApplyView(preview, null, "Нажмите «Отключиться», чтобы снять блокировку интернета."); break;
@@ -880,7 +891,7 @@ namespace Netlane {
         void SeedGraph() {
             speedGraph.Reset();
             double[] demo = { 1.1, 1.4, 1.2, 1.6, 1.3, 1.8, 1.5, 2.0, 1.7, 2.2, 1.9, 2.4, 2.1, 2.6, 2.3, 2.8, 2.5, 3.0, 2.7, 3.2, 2.9, 3.4, 3.1, 3.6, 3.3, 3.8, 3.5, 4.0, 3.7, 4.2, 3.9, 4.4, 4.1, 4.6, 4.3, 4.8, 4.5, 5.0, 4.7, 5.2, 4.9, 5.4, 5.1, 5.6, 5.3, 5.8, 5.5, 6.0, 5.7, 6.2, 5.9, 6.4, 6.1, 6.6, 6.3, 6.8, 6.5, 7.0, 6.7, 2.4 };
-            foreach (double value in demo) speedGraph.Push(value * 1024 * 1024);
+            for (int i = 0; i < demo.Length; i++) speedGraph.Push(demo[i] * 1024 * 1024 * (0.55 + 0.45 * Math.Abs(Math.Sin(i * 1.7))), (90 + 70 * Math.Abs(Math.Cos(i * 1.3)) + (i % 11 == 4 ? 260 : 0)) * 1024);
         }
         void ControlsEnabled() {
             bool hasServer = Selected != null;
@@ -888,7 +899,7 @@ namespace Netlane {
             table.Enabled = !busy;
             emptyPrimary.Enabled = emptySecondary.Enabled = !busy;
             transportButton.Enabled = setButton.Enabled = !busy;
-            pingLink.Enabled = !busy && hasServer && !checkingPings;
+            table.PingEnabled = !busy && hasServer;
         }
         internal string UniqueSetName(string name) {
             string candidate = name; int n = 2;
@@ -1066,6 +1077,6 @@ namespace Netlane {
             EngineLog.Write("restore: end in " + restoreClock.ElapsedMilliseconds + " ms");
         }
         async Task Exit() { if (busy) { Restore(); return; } if (connection.Active) { await Disconnect(); if (connection.Active) { Restore(); return; } } exiting = true; tray.Visible = false; Close(); }
-        protected override void Dispose(bool disposing) { if (disposing) { timer.Dispose(); subscriptionTimer.Dispose(); tips.Dispose(); if (trayMenu != null) trayMenu.Dispose(); if (tray != null) tray.Dispose(); connection.Dispose(); appIcon.Dispose(); trayIcon.Dispose(); brandMark.Dispose(); } base.Dispose(disposing); }
+        protected override void Dispose(bool disposing) { if (disposing) { timer.Dispose(); pingNoteTimer.Dispose(); subscriptionTimer.Dispose(); tips.Dispose(); if (trayMenu != null) trayMenu.Dispose(); if (tray != null) tray.Dispose(); connection.Dispose(); appIcon.Dispose(); trayIcon.Dispose(); brandMark.Dispose(); } base.Dispose(disposing); }
     }
 }

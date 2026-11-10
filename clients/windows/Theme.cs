@@ -24,6 +24,8 @@ namespace Netlane {
         internal static readonly Color AccentInk = Color.FromArgb(0x06, 0x22, 0x2A);
         internal static readonly Color Protected = Color.FromArgb(0x62, 0xDB, 0xB0);
         internal static readonly Color Warning = Color.FromArgb(0xFF, 0xBF, 0x87);
+        // Sending, beside the accent for receiving: the arrows ↑ and the lower speed lane.
+        internal static readonly Color Upload = Color.FromArgb(0xFF, 0xBF, 0x87);
         internal static readonly Color Danger = Color.FromArgb(0xF2, 0x83, 0x7A);
         // Colors of the drawn fallback app icon (used only when the embedded .ico is missing).
         internal static readonly Color IconNavy = Color.FromArgb(0x09, 0x1A, 0x52), IconCyan = Color.FromArgb(0x00, 0xE5, 0xF5);
