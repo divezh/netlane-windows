@@ -128,7 +128,7 @@ namespace Netlane {
                 if(Type.GetType("Mono.Runtime")==null)foreach(string caption in new[]{"Ваш IP","Набор правил","Транспорт","DNS","Kill Switch"}){Label label=all.OfType<Label>().FirstOrDefault(c=>c.Text==caption);Check(label!=null&&TextRenderer.MeasureText(label.Text,label.Font).Width<=label.Width,"Session caption fits in the interface font: "+caption+(label==null?"":" "+TextRenderer.MeasureText(label.Text,label.Font).Width+"/"+label.Width));}
                 Check(!all.Any(c=>c is LinkLabel&&c.Visible&&(c.Text=="Проверить пинг"||c.Text=="Добавить ссылку…")),"Ping check and adding live in the table, not as links under it.");
                 Check(table.AddRowBounds.Bottom<=table.Height&&table.RefreshBounds.Right<=table.Width,"The add row and the refresh glyph fit the table: "+table.AddRowBounds+" / "+table.RefreshBounds);
-                Check(f.Size.Width==920&&f.Size.Height==560,"Default window is 920 × 560: "+f.Size);
+                Check(f.Size.Width==920&&f.Size.Height==560,"Default window is 920 × 560: "+f.Size);f.CenterHome();Check(f.HomeTopForTests>=24,"A tall page centres the columns instead of leaving the space below: "+f.HomeTopForTests);
                 List<NavItem> items=all.OfType<NavItem>().Where(c=>c.Visible).ToList();
                 Check(items.Count==MainForm.NavIds.Length&&items.Single(c=>c.Selected).Text=="Подключение","Navigation: six pages, «Подключение» first: "+items.Count);
                 Check(items.All(c=>c.Glyph==(string)c.Tag),"Every navigation item draws its own icon.");

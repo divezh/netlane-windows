@@ -56,6 +56,8 @@ namespace Netlane {
         int HeaderHeight { get { return (int)(28 * scale); } }
         int RowHeight { get { return (int)(36 * scale); } }
         int VisibleRows { get { return Math.Max(1, (Height - HeaderHeight - (int)(28 * scale)) / Math.Max(1, RowHeight)); } }
+        // Header, every row and the ping note under the add row: the height the table needs to show everything.
+        internal int ContentHeight { get { float s; using (Graphics g = CreateGraphics()) s = g.DpiX / 96f; return (int)(28 * s) + (int)(4 * s) + Total * (int)(36 * s) + (int)(28 * s); } }
         void ClampScroll() { first = Math.Max(0, Math.Min(first, Total - VisibleRows)); }
         internal Rectangle RowBounds(int row) { return new Rectangle(0, HeaderHeight + (int)(4 * scale) + (row - first) * RowHeight, Width, RowHeight - (int)(2 * scale)); }
         int RowAt(Point point) {

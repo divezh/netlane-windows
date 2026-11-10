@@ -212,14 +212,14 @@ namespace Netlane {
             idleOnly = new[] { (Control)idleHint };
             Control[] session = {
                 sessionCaption, Spacer(2),
-                ipRow, Lined(Pair("Набор правил", setButton, 42, 160)), Lined(Pair("Транспорт", transportSwitch, 40, 196)), Lined(Pair("DNS", dnsValue, 36, 160)), Lined(Pair("Kill Switch", killSwitch, 36, 60)),
+                ipRow, Pair("Набор правил", setButton, 42, 160), Pair("Транспорт", transportSwitch, 40, 196), Lined(Pair("DNS", dnsValue, 36, 160)), Pair("Kill Switch", killSwitch, 36, 60),
                 idleHint, graphGap, speedGraph
             };
             for (int i = session.Length - 1; i >= 0; i--) sessionPane.Controls.Add(session[i]);
 
             // Error: the reason, what to try, the engine tail and the way to the transport setting.
             errorPane = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Ground, Margin = new Padding(0), Visible = false };
-            errorDetail.Dock = DockStyle.Top; errorDetail.Height = 62; errorDetail.TextAlign = ContentAlignment.TopLeft; errorDetail.AutoEllipsis = false; errorDetail.Padding = new Padding(0, 8, 0, 0);
+            errorDetail.Dock = DockStyle.Top; errorDetail.Height = 74; errorDetail.TextAlign = ContentAlignment.TopLeft; errorDetail.AutoEllipsis = false; errorDetail.Padding = new Padding(0, 8, 0, 0);
             transportButton.Dock = DockStyle.Top; transportButton.Height = 34; transportButton.Margin = new Padding(0);
             Control[] trouble = { SectionCaption("Что случилось"), errorDetail, Spacer(6), tryCard, Spacer(8), logPreview, Spacer(8), transportButton };
             for (int i = trouble.Length - 1; i >= 0; i--) errorPane.Controls.Add(trouble[i]);
@@ -230,6 +230,9 @@ namespace Netlane {
             normalView.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); normalView.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 300));
             normalView.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             normalView.Controls.Add(locationsPane, 0, 0); normalView.Controls.Add(rightPane, 1, 0);
+            // Both columns sit in the middle of the page when it is taller than what they hold.
+            normalView.Resize += delegate { CenterHome(); };
+            homePage.VisibleChanged += delegate { CenterHome(); };
 
             // First launch: one primary action, a drop target and three steps.
             emptyView = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 11, BackColor = Theme.Ground, Margin = new Padding(0), Visible = false };
@@ -400,6 +403,17 @@ namespace Netlane {
             label.Paint += delegate(object sender, PaintEventArgs args) { using (Pen line = new Pen(Theme.Line)) args.Graphics.DrawLine(line, 0, label.Height - 1, label.Width, label.Height - 1); };
             return label;
         }
+        // The empty space of a tall window goes above and below the content instead of only below it.
+        internal void CenterHome() {
+            if (normalView == null || liveOnly == null) return;
+            // The tallest of the right column's states, so connecting or failing never moves the page.
+            int shared = sessionPane.Controls.Cast<Control>().Where(c => !liveOnly.Contains(c) && !idleOnly.Contains(c)).Sum(c => c.Height);
+            int rightNeed = Math.Max(shared + Math.Max(liveOnly.Sum(c => c.Height), idleOnly.Sum(c => c.Height)), errorPane.Controls.Cast<Control>().Sum(c => c.Height));
+            int need = Math.Max(topRow.Height + table.ContentHeight, rightNeed);
+            int top = Math.Max(0, (normalView.Height - need) / 2);
+            if (normalView.Padding.Top != top) normalView.Padding = new Padding(0, top, 0, 0);
+        }
+        internal int HomeTopForTests { get { return normalView.Padding.Top; } }
         // A row of the «Подключение» list: a hairline under it, as in a settings list.
         static Control Lined(TableLayoutPanel row) {
             row.Paint += delegate(object sender, PaintEventArgs args) { using (Pen line = new Pen(Theme.Line)) args.Graphics.DrawLine(line, 0, row.Height - 1, row.Width, row.Height - 1); };
@@ -471,6 +485,7 @@ namespace Netlane {
             foreach (Control c in liveOnly) c.Visible = live;
             foreach (Control c in idleOnly) c.Visible = !live;
             RefreshNetwork();
+            CenterHome();
         }
         // The engine runs (or is stopping): the session block; otherwise the «Сеть» block.
         bool Live { get { return view == ConnectionView.Connected || view == ConnectionView.Reconnecting || view == ConnectionView.KillSwitch || view == ConnectionView.Disconnecting; } }
