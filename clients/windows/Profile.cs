@@ -128,18 +128,15 @@ namespace Netlane {
         internal static readonly byte[] Entropy = Encoding.UTF8.GetBytes("Netlane.profile.v1");
         // Profiles saved before the rename: read once, then re-encrypted with the current entropy.
         internal static readonly byte[] LegacyEntropy = Encoding.UTF8.GetBytes("WinTrustTunnel.profile.v1");
-        internal static readonly byte[] LegacyRouteHubEntropy = Encoding.UTF8.GetBytes("RouteHubVPN.profile.v1");
         internal const string DataFolder = "Netlane";
         internal const string LegacyDataFolder = "WinTrustTunnel";
-        internal const string LegacyRouteHubDataFolder = "RouteHubVPN";
         internal static string DataDirectory { get { return MigrateDataDirectory(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)); } }
         // Moves the profile and log folder of a former app name once; keeps using it if the move is impossible.
         internal static string MigrateDataDirectory(string root) {
             string current = Path.Combine(root, DataFolder);
             if (Directory.Exists(current)) return current;
-            foreach (string legacyName in new[] { LegacyDataFolder, LegacyRouteHubDataFolder }) {
-                string legacy = Path.Combine(root, legacyName);
-                if (!Directory.Exists(legacy)) continue;
+            string legacy = Path.Combine(root, LegacyDataFolder);
+            if (Directory.Exists(legacy)) {
                 try { Directory.Move(legacy, current); return current; }
                 catch (IOException) { return legacy; }
                 catch (UnauthorizedAccessException) { return legacy; }
@@ -163,8 +160,7 @@ namespace Netlane {
             try { plain = ProtectedData.Unprotect(sealedBytes, Entropy, DataProtectionScope.CurrentUser); }
             catch (CryptographicException) {
                 legacy = true;
-                try { plain = ProtectedData.Unprotect(sealedBytes, LegacyEntropy, DataProtectionScope.CurrentUser); }
-                catch (CryptographicException) { plain = ProtectedData.Unprotect(sealedBytes, LegacyRouteHubEntropy, DataProtectionScope.CurrentUser); }
+                plain = ProtectedData.Unprotect(sealedBytes, LegacyEntropy, DataProtectionScope.CurrentUser);
             }
             Profile profile;
             try { profile = Profile.Deserialize(Encoding.UTF8.GetString(plain)); } finally { Array.Clear(plain, 0, plain.Length); }

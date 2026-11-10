@@ -82,9 +82,8 @@ namespace Netlane {
     // Portable rules file: deliberately contains no credentials, hostname or password.
     public static class RulesFile {
         public const string Format = "netlane-rules";
-        // Files exported by the former product names (*.wttrules, *.rhrules) stay importable.
+        // Files exported under the former product name (*.wttrules) stay importable.
         public const string LegacyFormat = "wintrusttunnel-rules";
-        public const string LegacyRouteHubFormat = "routehub-rules";
         public const int Version = 1;
         sealed class Envelope {
             public string Format { get; set; }
@@ -100,7 +99,7 @@ namespace Netlane {
             Envelope envelope;
             try { envelope = new JavaScriptSerializer { MaxJsonLength = 65536 }.Deserialize<Envelope>(text.Trim().TrimStart('\uFEFF')); }
             catch (Exception) { throw new FormatException("Файл не является файлом правил Netlane."); }
-            if (envelope == null || (envelope.Format != Format && envelope.Format != LegacyFormat && envelope.Format != LegacyRouteHubFormat)) throw new FormatException("Файл не является файлом правил Netlane.");
+            if (envelope == null || (envelope.Format != Format && envelope.Format != LegacyFormat)) throw new FormatException("Файл не является файлом правил Netlane.");
             if (envelope.Version != Version) throw new FormatException("Версия файла правил не поддерживается: " + envelope.Version + ".");
             if (envelope.Routing == null) throw new FormatException("В файле нет правил маршрутизации.");
             envelope.Routing.Validate();

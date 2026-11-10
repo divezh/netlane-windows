@@ -392,7 +392,7 @@ namespace Netlane {
             using (SettingsForm settings = new SettingsForm(host)) {
                 RuleSet first = settings.ImportRulesFile(file), second = settings.ImportRulesFile(file);
                 Check(first != null && first.Name == "Office" && first.Routing.Destinations.SequenceEqual(new[] { "office.example.com" }) && second != null && second.Name == "Office (2)", "Dropping Office.netlanerules twice makes «Office» and «Office (2)».");
-                Check(SettingsForm.DropKind(file) == "rules" && SettingsForm.DropKind(@"C:\x\p.TOML") == "server" && SettingsForm.DropKind(@"C:\x\a.wttrules") == "rules" && SettingsForm.DropKind(@"C:\x\a.rhrules") == "rules" && SettingsForm.DropKind("a.exe") == null, "Drop kinds by extension.");
+                Check(SettingsForm.DropKind(file) == "rules" && SettingsForm.DropKind(@"C:\x\p.TOML") == "server" && SettingsForm.DropKind(@"C:\x\a.wttrules") == "rules" && SettingsForm.DropKind("a.exe") == null, "Drop kinds by extension.");
             }
         }
         static void FlagTests() {
@@ -508,10 +508,6 @@ namespace Netlane {
             dir=TempDir();byte[] plain=Encoding.UTF8.GetBytes(Profile.Import(Fixture).Serialize());
             File.WriteAllBytes(Path.Combine(dir,"profile.bin"),ProtectedData.Protect(plain,ProfileStore.LegacyEntropy,DataProtectionScope.CurrentUser));
             m=StateStore.LoadOrMigrate(dir,out notice);Check(notice==null&&m.Servers.Count==1,"Legacy entropy migrates.");
-            // The older RouteHubVPN entropy stays readable too.
-            dir=TempDir();
-            File.WriteAllBytes(Path.Combine(dir,"profile.bin"),ProtectedData.Protect(plain,ProfileStore.LegacyRouteHubEntropy,DataProtectionScope.CurrentUser));
-            m=StateStore.LoadOrMigrate(dir,out notice);Check(notice==null&&m.Servers.Count==1,"RouteHub entropy migrates.");
             // A corrupted profile is left untouched and the client starts empty with a notice.
             dir=TempDir();File.WriteAllBytes(Path.Combine(dir,"profile.bin"),new byte[]{1,2,3,4});
             m=StateStore.LoadOrMigrate(dir,out notice);
@@ -961,7 +957,7 @@ namespace Netlane {
                 string rulesFile=RulesFile.Export(shared);
                 Check(!rulesFile.Contains(profile.Password)&&!rulesFile.Contains(profile.Hostname),"Rules file leaks credentials.");
                 Routing restored=RulesFile.Import(rulesFile);
-                Check(rulesFile.Contains("\"netlane-rules\"")&&RulesFile.Import(rulesFile.Replace("\"netlane-rules\"","\"wintrusttunnel-rules\"")).Destinations.Count==restored.Destinations.Count&&RulesFile.Import(rulesFile.Replace("\"netlane-rules\"","\"routehub-rules\"")).Destinations.Count==restored.Destinations.Count,"Rules files from earlier versions are not importable.");
+                Check(rulesFile.Contains("\"netlane-rules\"")&&RulesFile.Import(rulesFile.Replace("\"netlane-rules\"","\"wintrusttunnel-rules\"")).Destinations.Count==restored.Destinations.Count,"Rules files from earlier versions are not importable.");
                 Check(restored.Mode=="selective"&&restored.Destinations.Count==2&&restored.Destinations[0]=="*.example.com","Rules file round trip failed.");
                 foreach(string malformed in new[]{"{\"format\":\"other\"}","{\"format\":\"netlane-rules\",\"version\":2,\"routing\":{}}","{\"format\":\"netlane-rules\",\"version\":1}","","["}){bool rulesRejected=false;try{RulesFile.Import(malformed);}catch(FormatException){rulesRejected=true;}Check(rulesRejected,"Malformed rules file accepted: "+malformed);}
                 Profile oversized=Profile.Import(Fixture);for(int i=0;i<256;i++)oversized.Routing.Destinations.Add(new string('a',60)+"."+new string('b',60)+"."+new string('c',60)+".route"+i+".example.com");bool oversizedRejected=false;try{oversized.Serialize();}catch(FormatException){oversizedRejected=true;}Check(oversizedRejected,"Oversized profile would exceed worker or storage limits.");

@@ -8,7 +8,7 @@ using System.Windows.Forms;
 
 namespace Netlane {
     // Editor of one rule set (spec §3), the former routing window as a control: mode, tabs with
-    // counts, the active list, and one footer row «Импорт · Экспорт · Удалить выбранное … Сохранить»
+    // counts, the active list, and one footer row «Импорт · Экспорт · Удалить … Сохранить»
     // docked to the bottom so it stays in place however the window is resized.
     internal sealed class RuleSetEditor : UserControl {
         internal Routing Value { get; private set; }
@@ -58,9 +58,9 @@ namespace Netlane {
             Label help = MainForm.TextLabel("Без порта и без http://, например example.com, *.example.com, 192.0.2.5, 10.0.0.0/8.", Theme.SmallSize, Theme.Faint); help.Margin = new Padding(0, 6, 0, 0); layout.Controls.Add(help, 0, 4);
             // Footer: one row, buttons sized to their text, «Сохранить» in the right corner.
             TableLayoutPanel footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1, Margin = new Padding(0), BackColor = Theme.Ground };
-            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 168)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 124));
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 94)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 104)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 112));
             footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            Button import = MainForm.Button("Импорт", false), export = MainForm.Button("Экспорт", false), removeSelected = MainForm.Button("Удалить выбранное", false), save = MainForm.Button("Сохранить", true);
+            Button import = MainForm.Button("Импорт", false), export = MainForm.Button("Экспорт", false), removeSelected = MainForm.Button("Удалить", false), save = MainForm.Button("Сохранить", true);
             import.Margin = new Padding(0, 0, 8, 0); export.Margin = new Padding(0, 0, 8, 0); removeSelected.Margin = new Padding(0); save.Margin = new Padding(0);
             footer.Controls.Add(import, 0, 0); footer.Controls.Add(export, 1, 0); footer.Controls.Add(removeSelected, 2, 0); footer.Controls.Add(save, 4, 0);
             layout.Controls.Add(footer, 0, 5);
@@ -87,7 +87,7 @@ namespace Netlane {
                 }
             };
             import.Click += delegate {
-                using (OpenFileDialog dialog = new OpenFileDialog { Filter = "Правила Netlane (*.netlanerules;*.wttrules;*.rhrules;*.json)|*.netlanerules;*.wttrules;*.rhrules;*.json", Title = "Импорт правил в этот набор" }) {
+                using (OpenFileDialog dialog = new OpenFileDialog { Filter = "Правила Netlane (*.netlanerules;*.wttrules;*.json)|*.netlanerules;*.wttrules;*.json", Title = "Импорт правил в этот набор" }) {
                     if (dialog.ShowDialog(this) != DialogResult.OK) return;
                     try {
                         if (new FileInfo(dialog.FileName).Length > 65536) throw new FormatException("Файл правил слишком большой.");

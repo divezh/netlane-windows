@@ -54,7 +54,14 @@ namespace Netlane {
                         preview.Show(); Application.DoEvents();
                         string dump = Environment.GetEnvironmentVariable("NETLANE_LAYOUT_DUMP");
                         if (!String.IsNullOrEmpty(dump)) DumpLayout(preview, dump);
-                        using (Bitmap bitmap = new Bitmap(preview.Width, preview.Height)) { preview.DrawToBitmap(bitmap, new Rectangle(Point.Empty, preview.Size)); bitmap.Save(request.Output); }
+                        // Only the client area: DrawToBitmap paints the window frame in the classic style,
+                        // which is not what Windows 10 and 11 show.
+                        using (Bitmap bitmap = new Bitmap(preview.Width, preview.Height)) {
+                            preview.DrawToBitmap(bitmap, new Rectangle(Point.Empty, preview.Size));
+                            Point client = preview.PointToScreen(Point.Empty);
+                            Rectangle area = Rectangle.Intersect(new Rectangle(client.X - preview.Left, client.Y - preview.Top, preview.ClientSize.Width, preview.ClientSize.Height), new Rectangle(Point.Empty, bitmap.Size));
+                            using (Bitmap content = bitmap.Clone(area, bitmap.PixelFormat)) content.Save(request.Output);
+                        }
                     } catch (Exception error) { Console.Error.WriteLine("render failed: " + error); return 3; }
                 }
                 return 0;

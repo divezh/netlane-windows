@@ -5,7 +5,7 @@ using System.Linq;
 using System.Windows.Forms;
 
 namespace Netlane {
-    // Drag and drop (spec §4): a .toml adds a server, a .netlanerules/.wttrules/.rhrules becomes a new rule set.
+    // Drag and drop (spec §4): a .toml adds a server, a .netlanerules/.wttrules becomes a new rule set.
     internal sealed partial class SettingsForm {
         // Drops land on whatever control is under the cursor: accept them on the whole tree, each control once.
         internal static void AcceptDrops(Control root, Action<string> dropped) {
@@ -26,7 +26,7 @@ namespace Netlane {
         // "server", "rules" or null for files the app does not take.
         internal static string DropKind(string path) {
             string ext = (Path.GetExtension(path ?? "") ?? "").ToLowerInvariant();
-            return ext == ".toml" ? "server" : ext == ".netlanerules" || ext == ".wttrules" || ext == ".rhrules" ? "rules" : null;
+            return ext == ".toml" ? "server" : ext == ".netlanerules" || ext == ".wttrules" ? "rules" : null;
         }
         internal static string DroppedFile(IDataObject data) {
             if (data == null || !data.GetDataPresent(DataFormats.FileDrop)) return null;
