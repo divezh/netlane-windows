@@ -1,0 +1,168 @@
+name: build-and-sign
+
+# Builds the Windows client on a GitHub-hosted runner, tests it, attests the archive's provenance and,
+# on a v* tag, publishes a GitHub Release.
+#
+# Authenticode signing goes through SignPath Foundation (free for open source). It turns on by itself
+# once the repository variables SIGNPATH_ORGANIZATION_ID and SIGNPATH_PROJECT_SLUG and the secret
+# SIGNPATH_API_TOKEN are set (docs/SIGNPATH.md). Until then the build is unsigned but still attested.
+#
+# The engine is signed before the client is built: Netlane.exe pins the engine's SHA-256, so signing the
+# engine afterwards would break the pin.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write      # create the release on a tag
+  id-token: write      # artifact attestations
+  attestations: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      ENGINE_APP_URL: https://raw.githubusercontent.com/divezh/netlane-updates/main/v0.5.4/Netlane-windows-x64.zip
+      ENGINE_APP_SHA256: c022c6144010a476e471948a1ead9df2608b26913cc4a22824f9f3ee22706adb
+      SIGNPATH_ENABLED: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' && vars.SIGNPATH_PROJECT_SLUG != '' }}
+      SIGNPATH_SIGNING_POLICY_SLUG: ${{ startsWith(github.ref, 'refs/tags/v') && 'release-signing' || 'test-signing' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch the patched engine from the pinned public release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Invoke-WebRequest -UseBasicParsing -Uri $env:ENGINE_APP_URL -OutFile engine-app.zip
+          $actual = (Get-FileHash engine-app.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $env:ENGINE_APP_SHA256) { throw "Engine archive hash mismatch: $actual" }
+          Expand-Archive engine-app.zip -DestinationPath engine-app
+          New-Item -ItemType Directory -Force engine-unsigned | Out-Null
+          Copy-Item engine-app/engine/trusttunnel_client.exe engine-unsigned/trusttunnel_client.exe
+
+      - name: Upload unsigned engine
+        id: upload-engine
+        if: env.SIGNPATH_ENABLED == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: netlane-engine-unsigned
+          path: engine-unsigned/trusttunnel_client.exe
+          if-no-files-found: error
+
+      - name: Sign engine
+        if: env.SIGNPATH_ENABLED == 'true'
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: engine
+          github-artifact-id: ${{ steps.upload-engine.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: engine-signed
+
+      - name: Put the engine where the build expects it
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $engine = Get-ChildItem engine-signed -Recurse -Filter trusttunnel_client.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($env:SIGNPATH_ENABLED -eq 'true' -and -not $engine) { throw 'SignPath did not return trusttunnel_client.exe' }
+          if (-not $engine) { $engine = Get-Item engine-unsigned/trusttunnel_client.exe }
+          $target = 'research/windows-client/cmake-build-msvc-relwithdebinfo/trusttunnel/trusttunnel_client.exe'
+          New-Item -ItemType Directory -Force (Split-Path $target) | Out-Null
+          Copy-Item $engine.FullName $target -Force
+
+      - name: Build client
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File clients/windows/build.ps1 -DownloadEngine -NoTest
+
+      - name: Test client
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & artifacts/windows/Netlane/NetlaneTests.exe
+          if ($LASTEXITCODE -ne 0) { throw "Tests failed: $LASTEXITCODE" }
+
+      - name: Upload unsigned client
+        id: upload-client
+        if: env.SIGNPATH_ENABLED == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: netlane-client-unsigned
+          # The artifact root must hold Netlane.exe, engine/ and licenses/ (.signpath/artifact-configurations/client.xml).
+          path: |
+            artifacts/windows/Netlane/
+            !artifacts/windows/Netlane/NetlaneTests.exe
+          if-no-files-found: error
+
+      - name: Sign Netlane.exe
+        if: env.SIGNPATH_ENABLED == 'true'
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: client
+          github-artifact-id: ${{ steps.upload-client.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: app-signed
+
+      - name: Final archive and SHA-256
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $zip = 'dist/Netlane-windows-x64.zip'
+          if ($env:SIGNPATH_ENABLED -eq 'true') {
+            $signed = Get-ChildItem app-signed -Recurse -Filter '*.zip' | Select-Object -First 1
+            if ($signed) { Copy-Item $signed.FullName $zip -Force }
+            else {
+              if (-not (Get-ChildItem app-signed)) { throw 'SignPath returned an empty artifact directory' }
+              Compress-Archive -Path (Join-Path 'app-signed' '*') -DestinationPath $zip -Force
+            }
+          } else {
+            Copy-Item artifacts/Netlane-windows-x64.zip $zip -Force
+          }
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  Netlane-windows-x64.zip" | Set-Content "$zip.sha256" -Encoding ASCII
+          Write-Host "Archive SHA-256: $hash (signed: $env:SIGNPATH_ENABLED)"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: dist/Netlane-windows-x64.zip
+
+      - name: Upload archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: Netlane-windows-x64
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          # Release notes: the CHANGELOG section of this version.
+          $lines = Get-Content CHANGELOG.md -Encoding UTF8
+          $start = [Array]::FindIndex($lines, [Predicate[string]]{ param($l) $l -like "## $version*" })
+          $notes = if ($start -ge 0) {
+            $end = [Array]::FindIndex($lines, $start + 1, [Predicate[string]]{ param($l) $l -like '## *' })
+            if ($end -lt 0) { $end = $lines.Length }
+            ($lines[($start + 1)..($end - 1)] -join "`n").Trim()
+          } else { "Netlane $version" }
+          $signedNote = if ($env:SIGNPATH_ENABLED -eq 'true') { 'Netlane.exe и движок подписаны SignPath Foundation.' } else { 'Исполняемые файлы пока без подписи Authenticode: подпись SignPath Foundation появится после одобрения заявки.' }
+          $notes += "`n`n$signedNote`n`nПроверка происхождения архива: ``gh attestation verify Netlane-windows-x64.zip --repo $env:GITHUB_REPOSITORY``"
+          Set-Content release-notes.md $notes -Encoding UTF8
+          gh release create $env:GITHUB_REF_NAME dist/Netlane-windows-x64.zip dist/Netlane-windows-x64.zip.sha256 --title "Netlane $version" --notes-file release-notes.md

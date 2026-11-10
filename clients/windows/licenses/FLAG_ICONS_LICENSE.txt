@@ -1,0 +1,14 @@
+Twemoji country flag graphics
+==============================
+
+The flag images embedded in Netlane are Twemoji graphics:
+
+  https://github.com/twitter/twemoji
+
+Copyright 2020 Twitter, Inc and other contributors.
+
+Licensed under the Creative Commons Attribution 4.0 International license:
+https://creativecommons.org/licenses/by/4.0/
+
+The images are unmodified Twemoji 14.0.2 72×72 PNGs, downscaled to 20×20 and
+40×40 for the client.
