@@ -409,7 +409,9 @@ namespace Netlane {
             // The first-run page: a subscription that stopped giving servers says why.
             Subscription blockedFeed = state.Servers.Count == 0 ? state.Subscriptions.FirstOrDefault(Account.Blocked) : null;
             emptyTitle.Text = blockedFeed == null ? "Подключите первый сервер" : "Подписка не даёт серверов";
-            emptySub.Text = blockedFeed == null ? "Ссылку выдаёт администратор сервера." : "«" + blockedFeed.DisplayName + "»: " + Account.Reason(blockedFeed) + ". Обратитесь к администратору сервера.";
+            string blockedReason = blockedFeed == null ? null : Account.Reason(blockedFeed);
+            emptySub.Text = blockedReason == null ? "Ссылку выдаёт администратор сервера." : Char.ToUpper(blockedReason[0]) + blockedReason.Substring(1) + " — обратитесь к администратору.";
+            tips.SetToolTip(emptySub, blockedFeed == null ? null : "Подписка «" + blockedFeed.DisplayName + "»");
             emptySub.ForeColor = blockedFeed == null ? Theme.Muted : Theme.Warning;
             string accessDetails = Account.Details(selectedSubscription);
             tips.SetToolTip(subscriptionRow, selectedSubscription == null ? "Сервер добавлен вручную." : subscriptionRow.ActionText + (accessDetails == null ? "" : "\n" + accessDetails));

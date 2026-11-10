@@ -747,7 +747,7 @@ namespace Netlane {
             using(MainForm form=new MainForm(true,"expired",null)) {
                 form.Show();Application.DoEvents();
                 List<Control> all=AllControls(form);
-                Check(all.Any(c=>c.Visible&&c.Text=="Подписка не даёт серверов")&&all.Any(c=>c.Visible&&c.Text.Contains("доступ истёк")&&c.Text.Contains("администратор")),"The empty window says why the subscription gives no servers.");
+                Check(all.Any(c=>c.Visible&&c.Text=="Подписка не даёт серверов")&&all.Any(c=>c.Visible&&c.Text.StartsWith("Доступ истёк ")&&c.Text.Contains("администратор")),"The empty window says why the subscription gives no servers.");
             }
             using(MainForm form=new MainForm(true,"account",null)) {
                 form.Show();Application.DoEvents();
