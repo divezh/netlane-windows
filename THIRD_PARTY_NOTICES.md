@@ -23,15 +23,15 @@ Prebuilt Binaries License; полный текст: `licenses/WINTUN_LICENSE.txt
 
 - https://www.wintun.net/
 
-## Inter
+## Onest
 
-Шрифт интерфейса — Inter, Copyright (c) 2016 The Inter Project Authors, лицензия
-SIL Open Font License 1.1. В приложение встроены начертания Regular и SemiBold,
-сокращённые до латиницы, кириллицы и нужных знаков и прохинтованные ttfautohint
-(`clients/windows/fonts`).
+Шрифт интерфейса — Onest, Copyright 2021 The Onest Project Authors, лицензия
+SIL Open Font License 1.1. В приложение встроены начертания Regular (400) и SemiBold (600),
+полученные из вариативного шрифта, сокращённые до латиницы, кириллицы и нужных знаков
+и прохинтованные ttfautohint (`clients/windows/fonts`).
 
-- https://github.com/rsms/inter
-- Полный текст: `licenses/INTER_LICENSE.txt` в собранном архиве.
+- https://github.com/googlefonts/onest
+- Полный текст: `licenses/ONEST_LICENSE.txt` в собранном архиве.
 
 ## Twemoji
 

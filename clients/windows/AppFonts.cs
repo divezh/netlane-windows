@@ -6,7 +6,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 
 namespace Netlane {
-    // Inter (SIL OFL 1.1), Regular and SemiBold, ships inside Netlane.exe: subset to Latin, Cyrillic and the
+    // Onest (SIL OFL 1.1), Regular and SemiBold (static instances of the variable font), ships inside Netlane.exe: subset to Latin, Cyrillic and the
     // punctuation and arrows the interface uses, and hinted with ttfautohint for GDI. Each face is loaded twice:
     // into a PrivateFontCollection for GDI+ Font objects and with AddFontMemResourceEx for GDI, which
     // TextRenderer and the native controls draw with. If either fails the interface stays on Segoe UI.
@@ -40,10 +40,10 @@ namespace Netlane {
             // Mono (the Linux check build) keeps memory fonts only half-working: stay on the default face there.
             if (Type.GetType("Mono.Runtime") != null) return;
             try {
-                if (!Add("font.Inter-Regular.ttf") || !Add("font.Inter-SemiBold.ttf")) return;
+                if (!Add("font.Onest-Regular.ttf") || !Add("font.Onest-SemiBold.ttf")) return;
                 foreach (FontFamily family in collection.Families) {
-                    if (family.Name == "Inter") regular = family;
-                    else if (family.Name == "Inter SemiBold") semibold = family;
+                    if (family.Name == "Onest") regular = family;
+                    else if (family.Name == "Onest SemiBold") semibold = family;
                 }
             } catch (Exception error) { regular = semibold = null; EngineLog.Write("fonts: " + error.Message); }
         }

@@ -125,7 +125,7 @@ namespace Netlane {
                 Check(all.Any(c=>c is Label&&c.Visible&&c.Text=="↑ 210,0 МБ")&&all.Any(c=>c is Label&&c.Visible&&c.Text=="↓ 1,8 ГБ"),"Connected: sent and received in the session rows.");
                 LocationsTable table=(LocationsTable)all.First(c=>c is LocationsTable);
                 Check(table.Visible&&table.RowCount==2&&table.SelectedName=="Амстердам","Two locations: both are rows of the table: "+table.RowCount);
-                if(Type.GetType("Mono.Runtime")==null)foreach(string caption in new[]{"Время","Принято","Отправлено","Набор правил","Kill Switch"}){Label label=all.OfType<Label>().FirstOrDefault(c=>c.Text==caption);Check(label!=null&&TextRenderer.MeasureText(label.Text,label.Font).Width<=label.Width,"Session caption fits in Inter: "+caption+(label==null?"":" "+TextRenderer.MeasureText(label.Text,label.Font).Width+"/"+label.Width));}
+                if(Type.GetType("Mono.Runtime")==null)foreach(string caption in new[]{"Время","Принято","Отправлено","Набор правил","Kill Switch"}){Label label=all.OfType<Label>().FirstOrDefault(c=>c.Text==caption);Check(label!=null&&TextRenderer.MeasureText(label.Text,label.Font).Width<=label.Width,"Session caption fits in the interface font: "+caption+(label==null?"":" "+TextRenderer.MeasureText(label.Text,label.Font).Width+"/"+label.Width));}
                 if(Type.GetType("Mono.Runtime")==null)Check(f.PeakFitsForTests,"The peak line under the speed lanes fits its column.");
                 Check(!all.Any(c=>c is LinkLabel&&c.Visible&&(c.Text=="Проверить пинг"||c.Text=="Добавить ссылку…")),"Ping check and adding live in the table, not as links under it.");
                 Check(table.AddRowBounds.Bottom<=table.Height&&table.RefreshBounds.Right<=table.Width,"The add row and the refresh glyph fit the table: "+table.AddRowBounds+" / "+table.RefreshBounds);
@@ -171,7 +171,7 @@ namespace Netlane {
                 Check(action.Kind==ButtonKind.Primary,"Idle: the action is the primary «Подключиться».");
                 Check(all.OfType<StatusBlock>().Any(c=>c.Visible&&c.Title=="Не подключено"),"Idle status.");
                 Check(!all.Any(c=>c is Label&&c.Visible&&(c.Text.StartsWith("↓ ")||c.Text.StartsWith("↑ "))),"Idle: no traffic in the session rows.");
-                if(Type.GetType("Mono.Runtime")==null){using(Font body=Theme.Font(10f))using(Font strong=Theme.Font(10f,true))Check(AppFonts.Embedded&&body.Name=="Inter"&&strong.Name=="Inter SemiBold","The interface font is the embedded Inter: "+body.Name+" / "+strong.Name);}
+                if(Type.GetType("Mono.Runtime")==null){using(Font body=Theme.Font(10f))using(Font strong=Theme.Font(10f,true))Check(AppFonts.Embedded&&body.Name=="Onest"&&strong.Name=="Onest SemiBold","The interface font is the embedded Onest: "+body.Name+" / "+strong.Name);}
                 SpeedGraph lanes=new SpeedGraph(); lanes.Push(2048,100); lanes.Push(4096,300);
                 Check(lanes.SampleCount==2&&lanes.Peak==4096&&lanes.UpPeak==300&&lanes.Last(true)==300&&lanes.Last(false)==4096,"Speed lanes keep receive and send apart.");
                 lanes.Dispose();

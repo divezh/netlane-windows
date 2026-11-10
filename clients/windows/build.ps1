@@ -55,7 +55,7 @@ if ($RoutedEngine) {
 }
 foreach ($taskName in @('LICENSE.txt', 'WINTUN_LICENSE.txt')) { Copy-Item -LiteralPath (Join-Path $taskCache $taskName) -Destination (Join-Path $taskOutput "licenses/$taskName") -Force }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'licenses/FLAG_ICONS_LICENSE.txt') -Destination (Join-Path $taskOutput 'licenses/FLAG_ICONS_LICENSE.txt') -Force
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'licenses/INTER_LICENSE.txt') -Destination (Join-Path $taskOutput 'licenses/INTER_LICENSE.txt') -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'licenses/ONEST_LICENSE.txt') -Destination (Join-Path $taskOutput 'licenses/ONEST_LICENSE.txt') -Force
 $taskCompiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
 if (!(Test-Path -LiteralPath $taskCompiler)) { throw '.NET Framework 4.8 compiler is required.' }
 $taskSources = @('DnsSettings.cs','SettingsDns.cs','Theme.cs','AppFonts.cs','SessionStats.cs','Controls.cs','MainControls.cs','HomeControls.cs','PulseControls.cs','ServerMenu.cs','TrayController.cs','SettingsForm.cs','SettingsRules.cs','SettingsPages.cs','SettingsDrop.cs','Autostart.cs','Flags.cs','RuleSetEditor.cs','CountryPicker.cs','CountryNames.cs','ImportForm.cs','Latency.cs','Routing.cs','Profile.cs','ServerName.cs','ClientState.cs','Subscription.cs','StateStore.cs','EngineSpec.cs','RouteException.cs','Connection.cs','DarkControls.cs','MainForm.cs','UpdateFeed.cs','Updater.cs','UpdateDialog.cs','Program.cs') | ForEach-Object { Join-Path $PSScriptRoot $_ }
