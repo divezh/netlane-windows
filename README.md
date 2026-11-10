@@ -59,6 +59,38 @@ gh attestation verify .\Netlane-windows-x64.zip --repo divezh/netlane-windows
 
 После одобрения заявки в [SignPath Foundation](https://signpath.org) `Netlane.exe` и движок дополнительно подписываются бесплатной подписью Authenticode от SignPath Foundation; до этого исполняемые файлы не подписаны. Как это настроено — в [docs/SIGNPATH.md](docs/SIGNPATH.md).
 
+## Удаление
+
+Netlane не устанавливается в систему — это папка с программой. Чтобы удалить его:
+
+1. Отключите VPN и закройте Netlane (значок в трее → «Выход»).
+2. Если включали «Запускать вместе с Windows» — выключите в «Настройках» (или удалите значение `Netlane` в `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`).
+3. Удалите папку с программой и папку данных `%LOCALAPPDATA%\Netlane` (профили, журнал, скачанные обновления).
+
+Маршруты и блокировка Kill Switch действуют только пока VPN подключён и снимаются при отключении.
+
+## Конфиденциальность
+
+Netlane не собирает и не отправляет телеметрию. Программа подключается только:
+
+- к серверам и ссылкам подписки, которые добавил пользователь (подключение VPN, обновление подписки, проверка пинга);
+- к GitHub (`raw.githubusercontent.com`, `api.github.com`, `github.com`) — проверка обновлений при запуске и по кнопке, скачивание архива обновления. Передаётся обычный HTTPS-запрос с заголовком `User-Agent: Netlane/<версия>`; GitHub обрабатывает его по своей [политике конфиденциальности](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement).
+
+Профили, пароли и ссылки подписки хранятся только на этом компьютере, зашифрованные Windows DPAPI.
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+Подписываются только `Netlane.exe` и движок `trusttunnel_client.exe`, собранные в GitHub Actions из этого репозитория ([workflow](.github/workflows/build-and-sign.yml)). Каждую подпись релиза вручную одобряет approver.
+
+Team roles:
+
+- Committers and reviewers: [divezh](https://github.com/divezh)
+- Approvers: [divezh](https://github.com/divezh)
+
+Privacy policy: see [«Конфиденциальность»](#конфиденциальность). In short: this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it, except the update check against GitHub described above.
+
 ## Безопасность и ограничения
 
 Smart App Control может блокировать неизвестные приложения. Для публичного распространения используйте подпись от доверенного поставщика и проверяйте сборку на чистой Windows. Самоподписанный сертификат предназначен для контролируемых тестов и не гарантирует обход Smart App Control. Не устанавливайте неизвестные корневые сертификаты.
@@ -67,4 +99,4 @@ Smart App Control может блокировать неизвестные пр�
 
 ## Лицензии
 
-Собственный код Netlane распространяется под [лицензией MIT](LICENSE). Код TrustTunnel и Wintun распространяются на условиях соответствующих правообладателей, флаги — [flag-icons](https://github.com/lipis/flag-icons). Тексты лицензий зависимостей входят в готовый архив; лицензия флагов также хранится в `clients/windows/licenses/`.
+Собственный код Netlane распространяется под [лицензией MIT](LICENSE). Код TrustTunnel и Wintun распространяются на условиях соответствующих правообладателей, флаги — [Twemoji](https://github.com/twitter/twemoji) (CC-BY 4.0), шрифт — [Inter](https://github.com/rsms/inter) (SIL OFL 1.1). Тексты лицензий зависимостей входят в готовый архив; лицензия флагов также хранится в `clients/windows/licenses/`.

@@ -29,6 +29,19 @@ git log --all --stat -- .env '*.pfx' '*.p12' '*.key'
 Authenticode, но с аттестацией происхождения GitHub. Подпись включается сама, как только заданы
 переменные и секрет из раздела 3.
 
+## Требования к страницам проекта
+
+На главной странице (README) и на странице загрузки (каждый релиз) должен быть раздел или ссылка
+«Code signing policy» со строкой «Free code signing provided by SignPath.io, certificate by SignPath
+Foundation», ролями команды и ссылкой на политику конфиденциальности. В README это разделы
+«Code signing policy» и «Конфиденциальность»; в описание каждого релиза добавляйте строку:
+
+```
+Code signing policy: https://github.com/divezh/netlane-windows#code-signing-policy — free code signing provided by SignPath.io, certificate by SignPath Foundation.
+```
+
+Все участники команды должны включить двухфакторную аутентификацию в GitHub и SignPath.
+
 ## 2. Подать заявку
 
 1. Откройте https://signpath.org/apply.
