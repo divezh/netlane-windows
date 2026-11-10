@@ -67,33 +67,48 @@ namespace Netlane {
             if (progress != null) progress.Report(100);
         }
 
+        // The downloaded Netlane.exe installs itself: started as «Netlane.exe --apply-update <target> <pid>»
+        // from the unpacked folder, it waits for this process to exit, copies its own folder over the
+        // installed one and starts the installed copy. No script and no shell are involved.
         internal static void LaunchInstaller(string unpacked, string version) {
             string target = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            string folder = Path.Combine(Root, version);
-            string helper = Path.Combine(folder, "apply-update.ps1");
-            File.WriteAllText(helper, Script, new UTF8Encoding(false));
-            string powershell = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-            string arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"" + helper + "\" -ParentPid " + Process.GetCurrentProcess().Id
-                + " -Source \"" + unpacked + "\" -Target \"" + target + "\" -Exe \"Netlane.exe\"";
-            Process.Start(new ProcessStartInfo(powershell, arguments) { UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden });
+            string arguments = "--apply-update \"" + target + "\" " + Process.GetCurrentProcess().Id;
+            Process.Start(new ProcessStartInfo(Path.Combine(unpacked, "Netlane.exe"), arguments) { UseShellExecute = false, WorkingDirectory = unpacked });
         }
 
-        // Waits for the running app to exit, replaces the files with robocopy and starts it again.
-        const string Script = @"param([int]$ParentPid,[string]$Source,[string]$Target,[string]$Exe)
-$log = Join-Path $env:LOCALAPPDATA 'Netlane\update.log'
-function Write-Log([string]$Text) { try { Add-Content -LiteralPath $log -Value ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + ' ' + $Text) } catch { } }
-try {
-  try { Wait-Process -Id $ParentPid -Timeout 60 -ErrorAction Stop } catch { }
-  Get-Process -Name Netlane,trusttunnel_client -ErrorAction SilentlyContinue | ForEach-Object { try { Wait-Process -Id $_.Id -Timeout 30 -ErrorAction Stop } catch { } }
-  Start-Sleep -Seconds 1
-  for ($i = 0; $i -lt 15; $i++) {
-    & robocopy.exe $Source $Target /E /IS /IT /R:2 /W:1 | Out-Null
-    if ($LASTEXITCODE -lt 8) { Write-Log ('copied ' + $Source); break }
-    Start-Sleep -Seconds 1
-  }
-  if ($LASTEXITCODE -ge 8) { Write-Log ('copy failed ' + $LASTEXITCODE) }
-} catch { Write-Log ('error: ' + $_) }
-Start-Process -FilePath (Join-Path $Target $Exe)
-";
+        static string Log { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Netlane", "update.log"); } }
+        static void Note(string text) { try { File.AppendAllText(Log, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " " + text + Environment.NewLine); } catch (Exception) { } }
+
+        internal static int Apply(string target, int parentPid) {
+            string source = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            try {
+                if (String.IsNullOrEmpty(target) || !File.Exists(Path.Combine(target, "Netlane.exe"))) { Note("apply: no Netlane.exe in " + target); return 2; }
+                if (String.Equals(Path.GetFullPath(source), Path.GetFullPath(target), StringComparison.OrdinalIgnoreCase)) { Note("apply: source is the target"); return 2; }
+                try { using (Process parent = Process.GetProcessById(parentPid)) parent.WaitForExit(60000); } catch (ArgumentException) { } catch (InvalidOperationException) { }
+                WaitForExit("Netlane", 30000); WaitForExit("trusttunnel_client", 30000);
+                Exception last = null;
+                for (int attempt = 0; attempt < 15; attempt++) {
+                    try { CopyTree(source, target); last = null; break; }
+                    catch (IOException error) { last = error; } catch (UnauthorizedAccessException error) { last = error; }
+                    System.Threading.Thread.Sleep(1000);
+                }
+                Note(last == null ? "apply: copied " + source + " to " + target : "apply: copy failed: " + last.Message);
+            } catch (Exception error) { Note("apply: " + error.Message); }
+            try { Process.Start(new ProcessStartInfo(Path.Combine(target, "Netlane.exe")) { UseShellExecute = true, WorkingDirectory = target }); }
+            catch (Exception error) { Note("apply: start failed: " + error.Message); return 1; }
+            return 0;
+        }
+        // Other copies of the app and the engine still hold files in the target; this one is excluded.
+        static void WaitForExit(string name, int milliseconds) {
+            int self = Process.GetCurrentProcess().Id;
+            foreach (Process process in Process.GetProcessesByName(name)) {
+                using (process) { if (process.Id == self) continue; try { process.WaitForExit(milliseconds); } catch (Exception) { } }
+            }
+        }
+        internal static void CopyTree(string source, string target) {
+            Directory.CreateDirectory(target);
+            foreach (string file in Directory.GetFiles(source)) File.Copy(file, Path.Combine(target, Path.GetFileName(file)), true);
+            foreach (string folder in Directory.GetDirectories(source)) CopyTree(folder, Path.Combine(target, Path.GetFileName(folder)));
+        }
     }
 }

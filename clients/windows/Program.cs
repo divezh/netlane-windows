@@ -19,6 +19,8 @@ namespace Netlane {
         internal static bool StartHidden(string[] args) { return args != null && args.Length == 1 && args[0] == "--tray"; }
         [STAThread]
         static int Main(string[] args) {
+            // A downloaded update installs itself and restarts the app (Updater.LaunchInstaller).
+            if (args.Length == 3 && args[0] == "--apply-update") { int parent; return Int32.TryParse(args[2], out parent) ? Updater.Apply(args[1], parent) : 2; }
             if (args.Length == 3 && args[0] == "--worker") { int parent; return Int32.TryParse(args[2], out parent) ? Worker.Run(args[1], parent) : 2; }
             try { EngineLog.Write("startup: main begin; process age " + (long)(DateTime.Now - Process.GetCurrentProcess().StartTime).TotalMilliseconds + " ms"); } catch (Exception) { }
             Tls.Enable();

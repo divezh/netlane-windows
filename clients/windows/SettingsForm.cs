@@ -318,13 +318,15 @@ namespace Netlane {
                             g.DrawLine(pen, P(8.5f, top + 3), P(13, top + 3));
                         }
                         break;
-                    case "connection": // sliders
-                        float[][] rows = { new[] { 4f, 6f }, new[] { 9f, 12f }, new[] { 14f, 5f } };
-                        foreach (float[] row in rows) {
-                            g.DrawLine(pen, P(2, row[0]), P(16, row[0]));
-                            using (Brush hole = new SolidBrush(Theme.Ground)) g.FillEllipse(hole, x0 + (row[1] - 2) * u, y0 + (row[0] - 2) * u, 4 * u, 4 * u);
-                            g.DrawEllipse(pen, x0 + (row[1] - 2) * u, y0 + (row[0] - 2) * u, 4 * u, 4 * u);
+                    case "connection": // gear: eight teeth around a hub
+                        PointF[] teeth = new PointF[32];
+                        for (int k = 0; k < 8; k++) {
+                            float[] angles = { k * 45 - 15, k * 45 - 8, k * 45 + 8, k * 45 + 15 };
+                            float[] radii = { 5.6f, 7.6f, 7.6f, 5.6f };
+                            for (int j = 0; j < 4; j++) { double r = angles[j] * Math.PI / 180; teeth[k * 4 + j] = P(9 + radii[j] * (float)Math.Cos(r), 9 + radii[j] * (float)Math.Sin(r)); }
                         }
+                        g.DrawPolygon(pen, teeth);
+                        g.DrawEllipse(pen, x0 + 6.4f * u, y0 + 6.4f * u, 5.2f * u, 5.2f * u);
                         break;
                     case "log": // list
                         foreach (float y in new[] { 4f, 9f, 14f }) { g.FillEllipse(dot, x0 + 1.8f * u, y0 + (y - 1) * u, 2 * u, 2 * u); g.DrawLine(pen, P(6.5f, y), P(16, y)); }

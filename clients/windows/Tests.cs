@@ -614,6 +614,15 @@ namespace Netlane {
             string manifest="{\"version\":\"0.4.15\",\"url\":\"https://github.com/divezh/netlane-updates/releases/download/v0.4.15/Netlane-windows-x64.zip\",\"sha256\":\"2679abc3d2b95759b4d7814ae71d559f79afdb02de994572428828bc742d89f4\",\"notes\":\"Что нового\"}";
             ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls;Tls.Enable();
             Check((ServicePointManager.SecurityProtocol&SecurityProtocolType.Tls12)!=0,"HTTPS requests offer TLS 1.2 whatever runs first: "+ServicePointManager.SecurityProtocol);
+            string upd=Path.Combine(Path.GetTempPath(),"Netlane-test-upd-"+Guid.NewGuid().ToString("N"));
+            try{
+                string src=Path.Combine(upd,"new"),dst=Path.Combine(upd,"old");Directory.CreateDirectory(Path.Combine(src,"engine"));Directory.CreateDirectory(Path.Combine(dst,"engine"));
+                File.WriteAllText(Path.Combine(src,"Netlane.exe"),"new");File.WriteAllText(Path.Combine(src,"engine","e.exe"),"new engine");
+                File.WriteAllText(Path.Combine(dst,"Netlane.exe"),"old");File.WriteAllText(Path.Combine(dst,"engine","e.exe"),"old engine");File.WriteAllText(Path.Combine(dst,"keep.txt"),"kept");
+                Updater.CopyTree(src,dst);
+                Check(File.ReadAllText(Path.Combine(dst,"Netlane.exe"))=="new"&&File.ReadAllText(Path.Combine(dst,"engine","e.exe"))=="new engine"&&File.ReadAllText(Path.Combine(dst,"keep.txt"))=="kept","An update overwrites the installed files and keeps the rest.");
+                Check(Updater.Apply(Path.Combine(upd,"missing"),-1)==2,"An update into a folder without Netlane.exe is refused.");
+            }finally{try{Directory.Delete(upd,true);}catch(Exception){}}
             UpdateManifest parsed=UpdateFeed.Parse(manifest);
             Check(parsed.Version=="0.4.15"&&parsed.Url.EndsWith("Netlane-windows-x64.zip")&&parsed.Sha256.Length==64&&parsed.Notes=="Что нового","Public update manifest parsed: version, archive, checksum and notes.");
             Check(UpdateFeed.ManifestUrl=="https://raw.githubusercontent.com/divezh/netlane-windows/updates/latest.json"&&UpdateFeed.ReleaseUrl.Contains("/repos/divezh/netlane-windows/releases/latest"),"Updates come from the public netlane-windows repository.");
