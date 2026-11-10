@@ -22,7 +22,7 @@ namespace Netlane {
         // Account and feed line at the bottom of the navigation; a click refreshes the subscription.
         readonly SubscriptionRow subscriptionRow = new SubscriptionRow { Dock = DockStyle.Bottom, Height = 54, Margin = new Padding(0) };
         readonly StatusBlock statusBlock = new StatusBlock { Dock = DockStyle.Fill, Margin = new Padding(0), AlignLeft = true };
-        readonly SpeedGraph speedGraph = new SpeedGraph { Dock = DockStyle.Top, Height = 92, Margin = new Padding(0) };
+        readonly SpeedGraph speedGraph = new SpeedGraph { Dock = DockStyle.Top, Height = 84, Margin = new Padding(0) };
         readonly LocationsTable table = new LocationsTable { Dock = DockStyle.Fill, Margin = new Padding(0) };
         readonly TryCard tryCard = new TryCard { Dock = DockStyle.Top, Height = 104, Margin = new Padding(0) };
         readonly LogPreview logPreview = new LogPreview { Dock = DockStyle.Top, Height = 96, Margin = new Padding(0) };
@@ -43,6 +43,9 @@ namespace Netlane {
         DateTime lastPingCheck = DateTime.MinValue;
         readonly MiniSwitch killSwitch = new MiniSwitch { Anchor = AnchorStyles.Right, Margin = new Padding(0), AccessibleName = "Kill Switch" };
         bool refreshingKill;
+        // The selected server's transport, the same setting as on «Серверы»; changing it while connected reconnects.
+        readonly SegmentedControl transportSwitch = new SegmentedControl { Items = new[] { "HTTP/2", "HTTP/3" }, Anchor = AnchorStyles.Left | AnchorStyles.Right, Height = 28, Margin = new Padding(0, 2, 0, 2), AccessibleName = "Транспорт" };
+        internal const string TransportHint = "HTTP/3 (QUIC, UDP) — ровнее для звонков и видео. HTTP/2 (TCP) — если сеть режет UDP. Во время работы VPN переключение переподключает его.";
         string currentPage = "home";
         SettingsForm settings;
         LogPage logPage;
@@ -193,9 +196,9 @@ namespace Netlane {
             Control[] session = {
                 SectionCaption("Сессия"), Spacer(4),
                 Pair("Время", clock, 24, 150), Pair("Принято", received, 24, 150), Pair("Отправлено", sent, 24, 150),
-                Spacer(8), speedGraph, graphFoot, Spacer(12),
+                Spacer(6), speedGraph, graphFoot, Spacer(8),
                 SectionCaption("Маршрут и защита"), Spacer(4),
-                Pair("Набор правил", setButton, 36, 160), Pair("DNS", dnsValue, 30, 160), Pair("Kill Switch", killSwitch, 30, 60)
+                Pair("Набор правил", setButton, 34, 160), Pair("Транспорт", transportSwitch, 32, 160), Pair("DNS", dnsValue, 30, 160), Pair("Kill Switch", killSwitch, 30, 60)
             };
             for (int i = session.Length - 1; i >= 0; i--) sessionPane.Controls.Add(session[i]);
 
@@ -258,6 +261,7 @@ namespace Netlane {
             logPreview.CopyRequested += delegate { CopyEngineLog(); };
             table.Picked += delegate(string id) { if (!previewOnly) SwitchTo(id, null); };
             setButton.Click += delegate { OpenRoutingMenu(); };
+            transportSwitch.SelectedIndexChanged += delegate { if (!refreshingKill) SetTransport(transportSwitch.SelectedIndex == 1 ? "http3" : "http2"); };
             killSwitch.CheckedChanged += delegate { if (refreshingKill) return; state.KillSwitch = killSwitch.Checked; state.NotifyChanged(); SaveState(); };
             emptyPrimary.Glyph = ButtonGlyph.Clipboard;
             emptySecondary.Glyph = ButtonGlyph.None;
@@ -402,7 +406,7 @@ namespace Netlane {
         }
 
         // Puts the stored state on screen: the locations, the account line and the route rows.
-        void RefreshState() {
+        internal void RefreshState() {
             Server server = Selected;
             bool hasServer = server != null;
             table.SetServers(VisibleLocations.ToList(), state.SelectedServerId, pings);
@@ -425,7 +429,8 @@ namespace Netlane {
             setButton.Text = state.SelectedRuleSet.DisplayName;
             dnsValue.Text = selectedSubscription != null && selectedSubscription.ManagedDns != null ? "от администратора" : state.DnsServers != null && state.DnsServers.Count > 0 ? "личный" : "стандартный";
             refreshingKill = true;
-            try { killSwitch.Checked = state.KillSwitch; } finally { refreshingKill = false; }
+            try { killSwitch.Checked = state.KillSwitch; if (Selected != null) transportSwitch.SelectedIndex = Selected.Protocol == "http3" ? 1 : 0; } finally { refreshingKill = false; }
+            tips.SetToolTip(transportSwitch, TransportHint);
             tips.SetToolTip(setButton, state.KillSwitch ? KillSwitchSwitchHint : "Набор правил маршрутизации. Переключение во время работы VPN переподключает его.");
             UpdateStatusText();
             ControlsEnabled();
@@ -721,6 +726,14 @@ namespace Netlane {
         }
         // Changes the server and/or rule set (null = keep). While the VPN runs it restarts the engine with the
         // new selection; calls made during a switch only record the latest target, which runs once afterwards.
+        // Saves the selected server's transport; a running VPN restarts on it, like a changed rule set.
+        internal void SetTransport(string protocol) {
+            Server server = Selected;
+            if (server == null || server.Protocol == protocol) return;
+            server.Protocol = protocol; state.NotifyChanged(); SaveState();
+            if (!previewOnly && connection.Active) { reapplyPending = true; reapplyLabel = protocol == "http3" ? "HTTP/3" : "HTTP/2"; SwitchTo(null, null); }
+        }
+        internal int TransportIndexForTests { get { return transportSwitch.SelectedIndex; } }
         internal Task SwitchTo(string serverId, string ruleSetId) {
             if (serverId != null) pendingServer = serverId;
             if (ruleSetId != null) pendingSet = ruleSetId;
@@ -735,11 +748,13 @@ namespace Netlane {
             string target = null;
             if (serverId != null && serverId != state.SelectedServerId) { state.SelectServer(serverId); target = Selected.Name; latencyGeneration++; pingText = null; pings.TryGetValue(serverId, out pingText); }
             if (setId != null && setId != state.SelectedRuleSet.Id) { state.SelectRuleSet(setId); target = target ?? state.SelectedRuleSet.Name; }
-            if (target == null && reapplyPending) target = state.SelectedRuleSet.Name;
-            reapplyPending = false;
+            if (target == null && reapplyPending) target = reapplyLabel ?? state.SelectedRuleSet.Name;
+            reapplyPending = false; reapplyLabel = null;
             return target;
         }
-        void DropPending() { switchPending = reapplyPending = false; pendingServer = pendingSet = null; }
+        // What a reapply announces when it is not a rule set («Переключаю на «HTTP/3»…»).
+        string reapplyLabel;
+        void DropPending() { switchPending = reapplyPending = false; pendingServer = pendingSet = null; reapplyLabel = null; }
         async Task RunSwitches() {
             switching = true;
             try {
@@ -901,6 +916,7 @@ namespace Netlane {
             table.Enabled = !busy;
             emptyPrimary.Enabled = emptySecondary.Enabled = !busy;
             transportButton.Enabled = setButton.Enabled = !busy;
+            transportSwitch.Enabled = !busy && hasServer;
             table.PingEnabled = !busy && hasServer;
         }
         internal string UniqueSetName(string name) {

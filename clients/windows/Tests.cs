@@ -184,6 +184,10 @@ namespace Netlane {
                 Pump(f.CheckPings());
                 Check(table.PingFor(0)=="31 мс"&&f.PingsForTests.Count==2&&f.PingsForTests[f.State.Servers[1].Id]=="нет ответа","Ping check measures every server and updates the table.");
                 Check(!table.Checking&&f.PingNoteForTests=="Пинг проверен только что","After a ping check the note under the table says when: "+f.PingNoteForTests);
+                string before=f.State.SelectedServer.Protocol;f.SetTransport("http3");f.RefreshState();
+                Check(f.State.SelectedServer.Protocol=="http3"&&f.TransportIndexForTests==1,"The transport switch on the main page sets the selected server's protocol.");
+                f.SetTransport(before);f.RefreshState();
+                Check(f.TransportIndexForTests==(before=="http3"?1:0)&&AllControls(f).Any(c=>c is SegmentedControl&&c.AccessibleName=="Транспорт"&&c.Visible),"The main page shows the transport switch.");
                 int pingAsks=0,addAsks=0; table.PingRequested+=delegate{pingAsks++;}; table.AddRequested+=delegate{addAsks++;};
                 table.RequestPing(); table.RequestAdd(); table.Checking=true; table.RequestPing(); table.Checking=false;
                 Check(pingAsks==1&&addAsks==1,"The refresh glyph and the add row raise their actions; a running check ignores another: "+pingAsks+"/"+addAsks);
