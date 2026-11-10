@@ -728,9 +728,10 @@ namespace Netlane {
             Subscription sub=state.AddSubscription("https://ams.example.com/abcdefghijklmnopqrstuvwxyz/sub/account");
             state.ApplyFeed(sub.Id,feed,null);
             Check(sub.AccountStatus=="active"&&sub.QuotaBytes==50L<<30&&sub.ExpiresAt==feed.ExpiresAt,"The account reaches the subscription.");
-            Check(Account.Summary(sub,now)=="до "+end.ToLocalTime().ToString("dd.MM")+" · 12,4 ГБ из 50 ГБ"||Account.Summary(sub,now)=="до "+end.ToLocalTime().ToString("dd.MM.yyyy")+" · 12,4 ГБ из 50 ГБ","Short line: "+Account.Summary(sub,now));
+            Check(Account.Summary(sub,now)=="до "+end.ToLocalTime().ToString(end.Year==now.Year?"dd.MM":"dd.MM.yyyy")+" · 12,4/50 ГБ","Short line: "+Account.Summary(sub,now));
             Check(Account.LevelOf(sub,now)==Account.Level.Normal,"Twelve days and a quarter of the quota are not a warning.");
-            Check(Account.Details(sub).Contains("Трафик за ноябрь: 12,4 ГБ из 50 ГБ (25%)")&&Account.Details(sub).StartsWith("Доступ до "),"Details: "+Account.Details(sub));
+            Check(Account.Details(sub).Contains("Трафик за ноябрь: 12,4 из 50 ГБ (25%)")&&Account.Details(sub).StartsWith("Доступ до "),"Details: "+Account.Details(sub));
+            sub.QuotaUsedBytes=300L<<20; Check(Account.Usage(sub,"/")=="300 МБ/50 ГБ","Different units stay on both sizes."); sub.QuotaUsedBytes=13314398617;
             Check(Account.LevelOf(sub,end.AddDays(-2))==Account.Level.Warning,"Two days left is a warning.");
             sub.QuotaUsedBytes=46L<<30; Check(Account.LevelOf(sub,now)==Account.Level.Warning,"90% of the quota is a warning.");
             Check(Account.Size(512L<<20)=="512 МБ"&&Account.Size(3L<<30)=="3 ГБ"&&Account.Size(25L<<30)=="25 ГБ","Sizes in МБ and ГБ.");
@@ -745,13 +746,14 @@ namespace Netlane {
             sub.AccountStatus=null; Check(Account.Summary(sub,now)==null&&Account.Details(sub)==null,"No account block, no line.");
             using(MainForm form=new MainForm(true,"expired",null)) {
                 form.Show();Application.DoEvents();
-                StatusBlock status=AllControls(form).OfType<StatusBlock>().First();
-                Check(status.Subtitle.StartsWith("Подписка «")&&status.Subtitle.Contains("доступ истёк"),"An empty window says why the subscription gives no servers: "+status.Subtitle);
+                List<Control> all=AllControls(form);
+                Check(all.Any(c=>c.Visible&&c.Text=="Подписка не даёт серверов")&&all.Any(c=>c.Visible&&c.Text.Contains("доступ истёк")&&c.Text.Contains("администратор")),"The empty window says why the subscription gives no servers.");
             }
             using(MainForm form=new MainForm(true,"account",null)) {
                 form.Show();Application.DoEvents();
                 SubscriptionRow row=AllControls(form).OfType<SubscriptionRow>().First();
-                Check(row.Visible&&row.Height==70&&row.AccountText!=null&&row.AccountText.Contains("из 50 ГБ"),"The login row grows a line for the access: "+row.AccountText);
+                Check(row.Visible&&row.Height==70&&row.AccountText!=null&&row.AccountText.EndsWith("12,4/50 ГБ"),"The login row grows a line for the access: "+row.AccountText);
+                Check(!AllControls(form).Any(c=>c.Visible&&c.Text=="Подписка не даёт серверов"),"A working subscription keeps the usual first-run text away.");
             }
         }
         static void EntrySubscriptionRefreshTests() {

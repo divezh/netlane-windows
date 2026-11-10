@@ -406,6 +406,11 @@ namespace Netlane {
             subscriptionRow.SubscriptionName = selectedSubscription == null ? "" : selectedSubscription.DisplayName;
             subscriptionRow.Subscription = selectedSubscription;
             subscriptionRow.Height = subscriptionRow.AccountText == null ? 54 : 70;
+            // The first-run page: a subscription that stopped giving servers says why.
+            Subscription blockedFeed = state.Servers.Count == 0 ? state.Subscriptions.FirstOrDefault(Account.Blocked) : null;
+            emptyTitle.Text = blockedFeed == null ? "Подключите первый сервер" : "Подписка не даёт серверов";
+            emptySub.Text = blockedFeed == null ? "Ссылку выдаёт администратор сервера." : "«" + blockedFeed.DisplayName + "»: " + Account.Reason(blockedFeed) + ". Обратитесь к администратору сервера.";
+            emptySub.ForeColor = blockedFeed == null ? Theme.Muted : Theme.Warning;
             string accessDetails = Account.Details(selectedSubscription);
             tips.SetToolTip(subscriptionRow, selectedSubscription == null ? "Сервер добавлен вручную." : subscriptionRow.ActionText + (accessDetails == null ? "" : "\n" + accessDetails));
             setButton.Text = state.SelectedRuleSet.DisplayName;

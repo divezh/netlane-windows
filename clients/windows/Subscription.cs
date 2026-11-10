@@ -365,6 +365,13 @@ namespace Netlane {
             if (bytes >= gb) { double v = bytes / gb; return (v < 100 ? v.ToString("0.#", Russian) : Math.Floor(v).ToString("0", Russian)) + " ГБ"; }
             return Math.Max(0, Math.Round(bytes / mb)).ToString("0", Russian) + " МБ";
         }
+        // «12,4/50 ГБ» or «12,4 из 50 ГБ»: one unit when both sizes share it.
+        internal static string Usage(Subscription s, string between) {
+            string used = Size(s.QuotaUsedBytes), total = Size(s.QuotaBytes);
+            string unit = total.Substring(total.LastIndexOf(' '));
+            if (used.EndsWith(unit)) used = used.Substring(0, used.Length - unit.Length);
+            return used + (between == "/" ? "/" : " " + between + " ") + total;
+        }
         static DateTime? End(Subscription s) { DateTime end; return s.ExpiresAt != null && TryParseDate(s.ExpiresAt, out end) ? end : (DateTime?)null; }
         // The panel no longer gives servers for one of these reasons.
         internal static bool Blocked(Subscription s) { return s.AccountStatus == "disabled" || s.AccountStatus == "expired" || s.AccountStatus == "pending" || s.AccountStatus == "exhausted"; }
@@ -386,7 +393,7 @@ namespace Netlane {
             if (s.QuotaBytes > 0 && s.QuotaUsedBytes >= s.QuotaBytes * 0.9) return Level.Warning;
             return Level.Normal;
         }
-        // Short, for the line under the login: «до 17.11 · 12 из 50 ГБ».
+        // Short, for the line under the login: «до 17.11 · 12,4/50 ГБ».
         internal static string Summary(Subscription s, DateTime nowUtc) {
             if (s == null || s.AccountStatus == null) return null;
             string reason = Reason(s);
@@ -397,17 +404,17 @@ namespace Netlane {
                 TimeSpan left = end.Value - nowUtc;
                 parts.Add(left <= TimeSpan.FromDays(1) ? "до " + end.Value.ToLocalTime().ToString("HH:mm", Russian) : "до " + end.Value.ToLocalTime().ToString(end.Value.Year == nowUtc.Year ? "dd.MM" : "dd.MM.yyyy", Russian));
             }
-            if (s.QuotaBytes > 0) parts.Add(Size(s.QuotaUsedBytes) + " из " + Size(s.QuotaBytes));
+            if (s.QuotaBytes > 0) parts.Add(Usage(s, "/"));
             return parts.Count == 0 ? null : String.Join(" · ", parts);
         }
-        // Full, for «Серверы»: «Доступ до 17 ноября 2026, 03:00 · Трафик за ноябрь: 12 из 50 ГБ (24%)».
+        // Full, for «Серверы»: «Доступ до 17.11.2026 03:00 · Трафик за ноябрь: 12,4 из 50 ГБ (25%)».
         internal static string Details(Subscription s) {
             if (s == null || s.AccountStatus == null) return null;
             List<string> parts = new List<string>();
             string reason = Reason(s);
             if (reason != null) parts.Add(Char.ToUpper(reason[0]) + reason.Substring(1));
             DateTime? end = End(s);
-            if (end.HasValue && s.AccountStatus != "expired") parts.Add("Доступ до " + end.Value.ToLocalTime().ToString("d MMMM yyyy, HH:mm", Russian));
+            if (end.HasValue && s.AccountStatus != "expired") parts.Add("Доступ до " + end.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm", Russian));
             if (!end.HasValue && reason == null) parts.Add("Доступ без срока");
             if (s.QuotaBytes > 0) {
                 string month = "";
@@ -415,7 +422,7 @@ namespace Netlane {
                 if (s.QuotaMonth != null && DateTime.TryParseExact(s.QuotaMonth + "-01", "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out first))
                     month = " за " + first.ToString("MMMM", Russian).ToLower(Russian);
                 long percent = Math.Min(100, (long)Math.Round(100d * s.QuotaUsedBytes / s.QuotaBytes));
-                parts.Add("Трафик" + month + ": " + Size(s.QuotaUsedBytes) + " из " + Size(s.QuotaBytes) + " (" + percent + "%)");
+                parts.Add("Трафик" + month + ": " + Usage(s, "из") + " (" + percent + "%)");
             }
             return String.Join(" · ", parts);
         }
