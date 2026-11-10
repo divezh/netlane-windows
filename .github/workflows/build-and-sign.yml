@@ -1,8 +1,9 @@
 name: build-and-sign
 
 # Builds the Windows client on a GitHub-hosted runner, tests it and attests the archive's provenance.
-# Publishing a GitHub Release (tag v*) runs it and attaches the archive and its SHA-256 to that release;
-# pushing a v* tag creates the release itself.
+# Publishing a GitHub Release (tag v*, created on the Releases page) runs it and attaches the archive and
+# its SHA-256 to that release. A bare tag push does not build: publishing the release already creates the
+# tag, and a second run would race the first one for the same release and the update channel.
 #
 # Authenticode signing goes through SignPath Foundation (free for open source). It turns on by itself
 # once the repository variables SIGNPATH_ORGANIZATION_ID and SIGNPATH_PROJECT_SLUG and the secret
@@ -17,13 +18,11 @@ name: build-and-sign
 on:
   release:
     types: [published]
-  push:
-    tags: ['v*']
   workflow_dispatch:
 
 permissions:
   actions: read
-  contents: write      # create the release on a tag
+  contents: write      # release assets and the updates branch
   id-token: write      # artifact attestations
   attestations: write
 
@@ -182,12 +181,8 @@ jobs:
           $notes += "`n`n$signedNote`n`nПроверка происхождения архива: ``gh attestation verify Netlane-windows-x64.zip --repo $env:GITHUB_REPOSITORY``"
           Set-Content release-notes.md $notes -Encoding UTF8
           $assets = @('dist/Netlane-windows-x64.zip', 'dist/Netlane-windows-x64.zip.sha256')
-          if ($env:GITHUB_EVENT_NAME -eq 'release') {
-            gh release upload $tag @assets --clobber
-            gh release edit $tag --title "Netlane $version" --notes-file release-notes.md
-          } else {
-            gh release create $tag @assets --title "Netlane $version" --notes-file release-notes.md
-          }
+          gh release upload $tag @assets --clobber
+          gh release edit $tag --title "Netlane $version" --notes-file release-notes.md
 
       - name: Publish to the update channel
         if: startsWith(github.ref, 'refs/tags/v') && !github.event.release.prerelease

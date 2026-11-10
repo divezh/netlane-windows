@@ -101,12 +101,9 @@ Get-AuthenticodeSignature artifacts\windows\Netlane\engine\trusttunnel_client.ex
 
 ## 6. Релиз
 
-После успешной проверки подпишите тег:
-
-```text
-git tag v0.5.4
-git push origin v0.5.4
-```
+После успешной проверки опубликуйте релиз на странице Releases → Draft a new release:
+тег `vX.Y.Z` (совпадает с `Program.Version`), цель `main`, «Set as the latest release».
+Сам по себе push тега сборку не запускает.
 
 Workflow выберет `release-signing`, соберёт и подпишет архив и приложит его к
 релизу. Подписанный архив и `latest.json` с его хешем workflow сам выложит в
