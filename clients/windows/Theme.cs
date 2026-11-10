@@ -25,6 +25,8 @@ namespace Netlane {
         internal static readonly Color Protected = Color.FromArgb(0x62, 0xDB, 0xB0);
         internal static readonly Color Warning = Color.FromArgb(0xFF, 0xBF, 0x87);
         // Sending, beside the accent for receiving: the arrows ↑ and the lower speed lane.
+        // The filled «Отключить VPN» button.
+        internal static readonly Color Stop = Color.FromArgb(0xC4, 0x3B, 0x49), StopHover = Color.FromArgb(0xAD, 0x30, 0x3D);
         internal static readonly Color Upload = Color.FromArgb(0xFF, 0xBF, 0x87);
         internal static readonly Color Danger = Color.FromArgb(0xF2, 0x83, 0x7A);
         // Colors of the drawn fallback app icon (used only when the embedded .ico is missing).

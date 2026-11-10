@@ -249,13 +249,13 @@ namespace Netlane {
         protected override void OnMouseUp(MouseEventArgs args) { pressed = false; Invalidate(); base.OnMouseUp(args); }
         protected override void OnPaint(PaintEventArgs args) {
             args.Graphics.Clear(Parent == null ? MainForm.Ground : Parent.BackColor); args.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            bool danger = Kind == ButtonKind.Danger;
-            Color background = Enabled && Primary ? Theme.Accent : danger ? (hover && Enabled ? Theme.Soft(Theme.Danger) : (Parent == null ? Theme.Ground : Parent.BackColor)) : hover && Enabled ? Theme.Raised : Theme.Card;
+            bool danger = Kind == ButtonKind.Danger, stop = Kind == ButtonKind.Stop && Enabled;
+            Color background = stop ? (hover ? Theme.StopHover : Theme.Stop) : Enabled && Primary ? Theme.Accent : danger ? (hover && Enabled ? Theme.Soft(Theme.Danger) : (Parent == null ? Theme.Ground : Parent.BackColor)) : hover && Enabled ? Theme.Raised : Theme.Card;
             if (pressed && Enabled) background = Theme.Darken(background, 12);
-            Color foreground = !Enabled ? Theme.Faint : Primary ? Theme.AccentInk : danger ? Theme.Danger : ForeColor;
+            Color foreground = !Enabled ? Theme.Faint : stop ? Color.White : Primary ? Theme.AccentInk : danger ? Theme.Danger : ForeColor;
             using (GraphicsPath path = Shapes.Round(new RectangleF(0.5f, 0.5f, Width - 1, Height - 1), Theme.Px(args.Graphics, Theme.RadiusControl))) {
                 using (Brush fill = new SolidBrush(background)) args.Graphics.FillPath(fill, path);
-                if (!Primary || !Enabled) using (Pen border = new Pen(danger && Enabled ? Theme.Fade(Theme.Danger, 110) : Theme.Line)) args.Graphics.DrawPath(border, path);
+                if ((!Primary || !Enabled) && !stop) using (Pen border = new Pen(danger && Enabled ? Theme.Fade(Theme.Danger, 110) : Theme.Line)) args.Graphics.DrawPath(border, path);
             }
             float dpi = args.Graphics.DpiX / 96f;
             Rectangle text = ClientRectangle; text.Inflate(-(int)Theme.Px(args.Graphics, Glyph == ButtonGlyph.None ? 12 : 6), 0);

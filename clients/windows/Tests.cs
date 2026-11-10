@@ -118,14 +118,14 @@ namespace Netlane {
             using (MainForm f=new MainForm(true,null,ConnectionView.Connected)) {
                 f.Show();Application.DoEvents();List<Control> all=AllControls(f);
                 DarkButton action=(DarkButton)all.First(c=>c is DarkButton&&c.Visible&&c.Text=="Отключиться");
-                Check(action.Kind==ButtonKind.Secondary&&action.Enabled,"Connected: the action is a quiet «Отключиться».");
+                Check(action.Kind==ButtonKind.Stop&&action.Enabled,"Connected: the action is the red «Отключиться».");
                 Check(all.OfType<StatusBlock>().Any(c=>c.Visible&&c.Title=="Защищено"),"Connected: «Защищено» in the page header.");
                 Check(all.OfType<StatusBlock>().Any(c=>c.Visible&&c.Subtitle.Contains("HTTP/2")&&c.Subtitle.StartsWith("Амстердам")),"Connected: location and protocol under the status.");
-                Check(all.Any(c=>c is Label&&c.Visible&&c.Text=="00:42:17"),"Connected: session time in the session rows.");
-                Check(all.Any(c=>c is Label&&c.Visible&&c.Text=="↑ 210,0 МБ")&&all.Any(c=>c is Label&&c.Visible&&c.Text=="↓ 1,8 ГБ"),"Connected: sent and received in the session rows.");
+                Check(all.Any(c=>c is Label&&c.Visible&&c.Text.StartsWith("В сети 00:42:17")),"Connected: session time under the big button.");
+                Check(all.Any(c=>c is Label&&c.Visible&&c.Text.Contains("↓ 1,8 ГБ")&&c.Text.Contains("↑ 210,0 МБ")),"Connected: received and sent under the big button.");
                 LocationsTable table=(LocationsTable)all.First(c=>c is LocationsTable);
                 Check(table.Visible&&table.RowCount==2&&table.SelectedName=="Амстердам","Two locations: both are rows of the table: "+table.RowCount);
-                if(Type.GetType("Mono.Runtime")==null)foreach(string caption in new[]{"Время","Принято","Отправлено","Набор правил","Kill Switch"}){Label label=all.OfType<Label>().FirstOrDefault(c=>c.Text==caption);Check(label!=null&&TextRenderer.MeasureText(label.Text,label.Font).Width<=label.Width,"Session caption fits in the interface font: "+caption+(label==null?"":" "+TextRenderer.MeasureText(label.Text,label.Font).Width+"/"+label.Width));}
+                if(Type.GetType("Mono.Runtime")==null)foreach(string caption in new[]{"Ваш IP","Набор правил","Транспорт","DNS","Kill Switch"}){Label label=all.OfType<Label>().FirstOrDefault(c=>c.Text==caption);Check(label!=null&&TextRenderer.MeasureText(label.Text,label.Font).Width<=label.Width,"Session caption fits in the interface font: "+caption+(label==null?"":" "+TextRenderer.MeasureText(label.Text,label.Font).Width+"/"+label.Width));}
                 Check(!all.Any(c=>c is LinkLabel&&c.Visible&&(c.Text=="Проверить пинг"||c.Text=="Добавить ссылку…")),"Ping check and adding live in the table, not as links under it.");
                 Check(table.AddRowBounds.Bottom<=table.Height&&table.RefreshBounds.Right<=table.Width,"The add row and the refresh glyph fit the table: "+table.AddRowBounds+" / "+table.RefreshBounds);
                 Check(f.Size.Width==920&&f.Size.Height==560,"Default window is 920 × 560: "+f.Size);
@@ -189,7 +189,7 @@ namespace Netlane {
                 Check(chosen.AutoTransport&&f.TransportIndexForTests==0&&chosen.EffectiveProtocol==(chosen.AutoProtocol??"http3"),"«Авто» starts on HTTP/3 or on what last worked.");
                 chosen.Transport=before;f.RefreshState();
                 Check(AllControls(f).Any(c=>c is SegmentedControl&&c.AccessibleName=="Транспорт"&&c.Visible&&((SegmentedControl)c).Items.Length==3),"The main page shows the three-way transport switch.");
-                Check(AllControls(f).Any(c=>c is Label&&c.Visible&&c.Text=="Сеть")&&AllControls(f).Any(c=>c is Label&&c.AccessibleName=="Ваш IP"&&c.Visible)&&!AllControls(f).Any(c=>c is Label&&c.Visible&&c.Text=="Время"),"Disconnected: the «Сеть» block with the IP instead of an empty session.");
+                Check(AllControls(f).Any(c=>c is Label&&c.Visible&&c.Text=="Подключение")&&AllControls(f).Any(c=>c is Label&&c.AccessibleName=="Ваш IP"&&c.Visible)&&!AllControls(f).Any(c=>c is Label&&c.Visible&&c.Text=="Время"),"Disconnected: the «Сеть» block with the IP instead of an empty session.");
                 int pingAsks=0,addAsks=0; table.PingRequested+=delegate{pingAsks++;}; table.AddRequested+=delegate{addAsks++;};
                 table.RequestPing(); table.RequestAdd(); table.Checking=true; table.RequestPing(); table.Checking=false;
                 Check(pingAsks==1&&addAsks==1,"The refresh glyph and the add row raise their actions; a running check ignores another: "+pingAsks+"/"+addAsks);

@@ -4,7 +4,8 @@ using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace Netlane {
-    internal enum ButtonKind { Secondary, Primary, Danger }
+    // Stop: the filled red «Отключить VPN» of the home page; Danger: an outlined destructive action.
+    internal enum ButtonKind { Secondary, Primary, Danger, Stop }
     internal enum IconGlyph { Gear, Back, More, Refresh }
 
     // Base for the owner-drawn controls below: double buffered, focusable, Space/Enter click.

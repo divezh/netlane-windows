@@ -39,6 +39,8 @@ namespace Netlane {
         readonly DarkButton setButton = (DarkButton)Button("", false);
         // How sites see this computer (PublicIp), and the network block shown while disconnected.
         readonly Label ipValue = ValueLabel(), idleHint = TextLabel("", Theme.SmallSize, Theme.Faint), lastSession = TextLabel("", Theme.SmallSize, Theme.Muted);
+        // Under the big button: «В сети 00:42:17 · ↓ 1,8 ГБ · ↑ 210 МБ», or the last session while disconnected.
+        readonly Label heroLine = TextLabel("", Theme.SmallSize, Theme.Muted);
         Label sessionCaption;
         Control[] liveOnly, idleOnly;
         PublicIp publicIp;
@@ -178,17 +180,19 @@ namespace Netlane {
             pageHost = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Ground, Margin = new Padding(0) };
             homePage = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Ground, Padding = new Padding(24, 16, 24, 8) };
 
-            // State on the left, the one main action on the right.
-            topRow = new TableLayoutPanel { Dock = DockStyle.Top, Height = 60, ColumnCount = 2, RowCount = 1, Margin = new Padding(0), BackColor = Theme.Ground };
-            topRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); topRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160));
-            topRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            connectButton.Dock = DockStyle.None; connectButton.Anchor = AnchorStyles.Right | AnchorStyles.Top; connectButton.Size = new Size(152, 36); connectButton.Margin = new Padding(0, 4, 0, 0);
-            connectButton.Font = Theme.Font(Theme.BodySize + 0.5f, true); connectButton.ForeColor = Theme.Ink;
-            topRow.Controls.Add(statusBlock, 0, 0); topRow.Controls.Add(connectButton, 1, 0);
+            // Hero of the left column: the state large and centred, the one big action, the session line.
+            topRow = new TableLayoutPanel { Dock = DockStyle.Top, Height = 176, ColumnCount = 1, RowCount = 4, Margin = new Padding(0), BackColor = Theme.Ground };
+            topRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            foreach (int height in new[] { 66, 54, 26, 30 }) topRow.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
+            statusBlock.TitleSize = 20f; statusBlock.AlignLeft = false; statusBlock.Dock = DockStyle.Fill; statusBlock.Margin = new Padding(0, 8, 0, 0);
+            connectButton.Dock = DockStyle.None; connectButton.Anchor = AnchorStyles.None; connectButton.Size = new Size(240, 44); connectButton.Margin = new Padding(0);
+            connectButton.Font = Theme.Font(Theme.BodySize + 1f, true); connectButton.ForeColor = Theme.Ink;
+            heroLine.Dock = DockStyle.Fill; heroLine.TextAlign = ContentAlignment.MiddleCenter; heroLine.Margin = new Padding(0);
+            topRow.Controls.Add(statusBlock, 0, 0); topRow.Controls.Add(connectButton, 0, 1); topRow.Controls.Add(heroLine, 0, 2);
 
-            // Left column: the locations table and two quiet actions under it.
+            // Left column: the hero, then the locations (the selected one is the current server).
             Panel locationsPane = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Ground, Margin = new Padding(0) };
-            locationsPane.Controls.Add(table);
+            locationsPane.Controls.Add(table); locationsPane.Controls.Add(topRow);
 
             // Right column: the session, then the route and protection of the next connection.
             sessionPane = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Ground, Margin = new Padding(0) };
@@ -199,19 +203,17 @@ namespace Netlane {
             dnsValue.Click += delegate { OpenSettings("connection"); };
             tips.SetToolTip(dnsValue, "Настроить DNS");
             // Connected: the session with the public IP; disconnected: «Сеть» — the IP and the last session.
-            sessionCaption = SectionCaption("Сессия");
-            Control timeRow = Pair("Время", clock, 22, 150), downRow = Pair("Принято", received, 22, 150), upRow = Pair("Отправлено", sent, 22, 150), ipRow = Pair("Ваш IP", ipValue, 22, 200), graphGap = Spacer(4);
-            idleHint.Dock = DockStyle.Top; idleHint.Height = 20; lastSession.Dock = DockStyle.Top; lastSession.Height = 38; lastSession.AutoEllipsis = false; lastSession.TextAlign = ContentAlignment.TopLeft;
+            sessionCaption = SectionCaption("Подключение");
+            Control ipRow = Lined(Pair("Ваш IP", ipValue, 36, 200)), graphGap = Spacer(14);
+            idleHint.Dock = DockStyle.Top; idleHint.Height = 40; idleHint.AutoEllipsis = false; idleHint.TextAlign = ContentAlignment.MiddleLeft;
             ipValue.Cursor = Cursors.Hand; ipValue.AccessibleName = "Ваш IP";
             ipValue.Click += delegate { if (!previewOnly) CheckIp(0); };
-            liveOnly = new[] { timeRow, downRow, upRow, graphGap, (Control)speedGraph };
-            idleOnly = new[] { (Control)idleHint, lastSession };
+            liveOnly = new[] { graphGap, (Control)speedGraph };
+            idleOnly = new[] { (Control)idleHint };
             Control[] session = {
-                sessionCaption, Spacer(4),
-                timeRow, downRow, upRow, ipRow, idleHint, lastSession,
-                graphGap, speedGraph, Spacer(6),
-                SectionCaption("Маршрут и защита"), Spacer(4),
-                Pair("Набор правил", setButton, 34, 160), Pair("Транспорт", transportSwitch, 32, 196), Pair("DNS", dnsValue, 28, 160), Pair("Kill Switch", killSwitch, 28, 60)
+                sessionCaption, Spacer(2),
+                ipRow, Lined(Pair("Набор правил", setButton, 42, 160)), Lined(Pair("Транспорт", transportSwitch, 40, 196)), Lined(Pair("DNS", dnsValue, 36, 160)), Lined(Pair("Kill Switch", killSwitch, 36, 60)),
+                idleHint, graphGap, speedGraph
             };
             for (int i = session.Length - 1; i >= 0; i--) sessionPane.Controls.Add(session[i]);
 
@@ -258,7 +260,7 @@ namespace Netlane {
             footerNote = new Label { Text = "Профиль зашифрован Windows", AutoSize = true, Font = Theme.Font(Theme.CaptionSize), ForeColor = Theme.Faint, Anchor = AnchorStyles.Right, Margin = new Padding(0) };
             footer.Controls.Add(version, 0, 0); footer.Controls.Add(footerNote, 2, 0);
 
-            homePage.Controls.Add(normalView); homePage.Controls.Add(emptyHost); homePage.Controls.Add(topRow); homePage.Controls.Add(footer);
+            homePage.Controls.Add(normalView); homePage.Controls.Add(emptyHost); homePage.Controls.Add(footer);
             pageHost.Controls.Add(homePage);
             Shown += delegate { EngineLog.Write("startup: shown in " + startupClock.ElapsedMilliseconds + " ms"); if (!previewOnly && publicIp == null && !ipChecking) CheckIp(0); };
             Controls.Add(pageHost); Controls.Add(side);
@@ -398,6 +400,11 @@ namespace Netlane {
             label.Paint += delegate(object sender, PaintEventArgs args) { using (Pen line = new Pen(Theme.Line)) args.Graphics.DrawLine(line, 0, label.Height - 1, label.Width, label.Height - 1); };
             return label;
         }
+        // A row of the «Подключение» list: a hairline under it, as in a settings list.
+        static Control Lined(TableLayoutPanel row) {
+            row.Paint += delegate(object sender, PaintEventArgs args) { using (Pen line = new Pen(Theme.Line)) args.Graphics.DrawLine(line, 0, row.Height - 1, row.Width, row.Height - 1); };
+            return row;
+        }
         static TableLayoutPanel Pair(string caption, Control value, int height, int valueWidth) {
             TableLayoutPanel row = new TableLayoutPanel { Dock = DockStyle.Top, Height = height, ColumnCount = 2, RowCount = 1, Margin = new Padding(0), BackColor = Theme.Ground };
             row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, valueWidth));
@@ -456,14 +463,13 @@ namespace Netlane {
         void ShowView() {
             bool error = view == ConnectionView.Error;
             bool empty = Selected == null && !error;
-            topRow.Visible = normalView.Visible = !empty;
+            normalView.Visible = !empty;
             emptyHost.Visible = empty;
             sessionPane.Visible = !error;
             errorPane.Visible = error;
             bool live = Live;
             foreach (Control c in liveOnly) c.Visible = live;
             foreach (Control c in idleOnly) c.Visible = !live;
-            sessionCaption.Text = live ? "Сессия" : "Сеть";
             RefreshNetwork();
         }
         // The engine runs (or is stopping): the session block; otherwise the «Сеть» block.
@@ -479,12 +485,15 @@ namespace Netlane {
             else { ipValue.Text = publicIp.Text; ipValue.ForeColor = Theme.Ink; tip = (ipThroughVpn ? "Так вас видят сайты: адрес VPN-сервера." : "Так вас видят сайты: VPN выключен.") + "\nПроверено через cloudflare.com. Щёлкните, чтобы проверить ещё раз."; }
             tips.SetToolTip(ipValue, tip);
             idleHint.Text = Selected == null ? "" : state.HidePublicIp ? "VPN выключен: трафик идёт напрямую." : "VPN выключен: сайты видят ваш обычный IP.";
+            if (!Live && view != ConnectionView.Connecting) heroLine.Text = state.LastSessionEnd == null ? "" : "Последняя сессия: " + HumanDuration(state.LastSessionSeconds);
+            else if (view != ConnectionView.Connected) heroLine.Text = "";
             if (state.LastSessionEnd == null) { lastSession.Text = ""; tips.SetToolTip(lastSession, ""); }
             else {
                 lastSession.Text = "Последняя сессия: " + HumanDuration(state.LastSessionSeconds) + (state.LastSessionDown > 0 || state.LastSessionUp > 0 ? "\n↓ " + SessionStats.FormatBytes(state.LastSessionDown) + " · ↑ " + SessionStats.FormatBytes(state.LastSessionUp) : "");
                 DateTime end; string when = DateTime.TryParse(state.LastSessionEnd, null, System.Globalization.DateTimeStyles.RoundtripKind, out end) ? end.ToLocalTime().ToString("d MMMM, HH:mm", new System.Globalization.CultureInfo("ru-RU")) : "";
                 tips.SetToolTip(lastSession, (state.LastSessionServer ?? "") + (when.Length > 0 ? ", закончилась " + when : ""));
             }
+            tips.SetToolTip(heroLine, Live || state.LastSessionEnd == null ? "" : lastSession.Text.Replace("\n", " · ") + "\n" + tips.GetToolTip(lastSession));
         }
         internal static string HumanDuration(long seconds) {
             if (seconds < 60) return "меньше минуты";
@@ -900,6 +909,7 @@ namespace Netlane {
             sent.Text = hasTraffic ? "↑ " + SessionStats.FormatBytes(up) : Blank; received.Text = hasTraffic ? "↓ " + SessionStats.FormatBytes(down) : Blank;
             speed.Text = hasTraffic ? SessionStats.SpeedLine(downRate, upRate) : Blank;
             if (hasTraffic) speedGraph.Push(downRate, upRate);
+            heroLine.Text = "В сети " + clock.Text + (hasTraffic ? " · ↓ " + SessionStats.FormatBytes(down) + " · ↑ " + SessionStats.FormatBytes(up) : "");
             graphPeak.Text = PeakLine();
             tips.SetToolTip(speedGraph, "Последние 60 секунд" + (graphPeak.Text.Length > 0 ? " · " + graphPeak.Text : ""));
             tips.SetToolTip(speed, hasTraffic ? "" : "Скорость недоступна: нет данных счётчика VPN.");
@@ -984,7 +994,7 @@ namespace Netlane {
             // The button names the action; the state is said by the line beside it.
             bool stops = next == ConnectionView.Connected || next == ConnectionView.Reconnecting || next == ConnectionView.KillSwitch;
             connectButton.Text = stops ? "Отключиться" : next == ConnectionView.Error ? "Повторить" : next == ConnectionView.Connecting ? "Подключение…" : next == ConnectionView.Disconnecting ? "Отключение…" : "Подключиться";
-            connectButton.Kind = stops ? ButtonKind.Secondary : ButtonKind.Primary;
+            connectButton.Kind = stops ? ButtonKind.Stop : ButtonKind.Primary;
             connectButton.Invalidate();
             if (next != ConnectionView.Connected) {
                 clock.Text = sent.Text = received.Text = speed.Text = Blank; graphPeak.Text = "";
@@ -1009,6 +1019,7 @@ namespace Netlane {
                     ApplyView(preview, null, "");
                     clock.Text = "00:42:17"; sent.Text = "↑ " + SessionStats.FormatBytes(220200960); received.Text = "↓ " + SessionStats.FormatBytes(1932735283);
                     speed.Text = SessionStats.SpeedLine(2.4 * 1024 * 1024, 210 * 1024);
+                    heroLine.Text = "В сети " + clock.Text + " · " + received.Text + " · " + sent.Text;
                     SeedGraph(); graphPeak.Text = PeakLine(); lastPingCheck = DateTime.UtcNow.AddMinutes(-2); RefreshPingNote();
                     pingText = "53 мс"; if (Selected != null) pings[Selected.Id] = pingText; RefreshPings(); break;
                 case ConnectionView.Reconnecting: ApplyView(preview, null, "Переподключение: попытка 2 через 5 с"); break;

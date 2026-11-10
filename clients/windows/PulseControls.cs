@@ -18,14 +18,16 @@ namespace Netlane {
         internal bool DotHalo { get { return halo; } set { halo = value; Invalidate(); } }
         // Page header of the two-pane window: the dot, the title and the line under it start at the left edge.
         internal bool AlignLeft { get; set; }
+        // The home page hero draws the title larger.
+        internal float TitleSize { get; set; }
         internal StatusBlock() {
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor, true);
-            BackColor = Color.Transparent; TabStop = false;
+            BackColor = Color.Transparent; TabStop = false; TitleSize = 15f;
         }
         protected override void OnPaint(PaintEventArgs args) {
             Graphics g = args.Graphics;
             g.Clear(Parent == null ? Theme.Ground : Parent.BackColor); g.SmoothingMode = SmoothingMode.AntiAlias;
-            using (Font bold = Theme.Font(15f, true)) using (Font small = Theme.Font(Theme.SmallSize)) {
+            using (Font bold = Theme.Font(TitleSize, true)) using (Font small = Theme.Font(TitleSize > 15f ? Theme.BodySize : Theme.SmallSize)) {
                 Size titleSize = TextRenderer.MeasureText(g, title, bold, Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
                 int dot = (int)Theme.Px(g, 9), gap = (int)Theme.Px(g, 10);
                 int total = dot + gap + titleSize.Width;
