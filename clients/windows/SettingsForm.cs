@@ -105,7 +105,7 @@ namespace Netlane {
         // Top-docked stack: heading, the rows, the import buttons. What a link adds is told by the import dialog.
         Control BuildServersPage() {
             Panel page = new Panel { BackColor = Theme.Ground, AutoScroll = true };
-            Label heading = Heading("Серверы"); heading.Dock = DockStyle.Top; heading.Height = 34;
+            Label heading = Heading("Серверы"); heading.Dock = DockStyle.Top; heading.Height = 50; heading.TextAlign = ContentAlignment.TopLeft;
             FlowLayoutPanel actions = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 62, WrapContents = false, BackColor = Theme.Ground, Padding = new Padding(0, 16, 0, 0) };
             Button paste = MainForm.Button("Добавить по ссылке…", true), toml = MainForm.Button("Открыть TOML…", false);
             paste.Dock = toml.Dock = DockStyle.None; paste.Size = new Size(210, 40); toml.Size = new Size(160, 40); paste.Margin = new Padding(0, 0, 10, 0); toml.Margin = new Padding(0);
