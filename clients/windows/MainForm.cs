@@ -201,7 +201,7 @@ namespace Netlane {
             // Connected: the session with the public IP; disconnected: «Сеть» — the IP and the last session.
             sessionCaption = SectionCaption("Сессия");
             Control timeRow = Pair("Время", clock, 22, 150), downRow = Pair("Принято", received, 22, 150), upRow = Pair("Отправлено", sent, 22, 150), ipRow = Pair("Ваш IP", ipValue, 22, 200), graphGap = Spacer(4);
-            idleHint.Dock = DockStyle.Top; idleHint.Height = 20; lastSession.Dock = DockStyle.Top; lastSession.Height = 22;
+            idleHint.Dock = DockStyle.Top; idleHint.Height = 20; lastSession.Dock = DockStyle.Top; lastSession.Height = 38; lastSession.AutoEllipsis = false; lastSession.TextAlign = ContentAlignment.TopLeft;
             ipValue.Cursor = Cursors.Hand; ipValue.AccessibleName = "Ваш IP";
             ipValue.Click += delegate { if (!previewOnly) CheckIp(0); };
             liveOnly = new[] { timeRow, downRow, upRow, graphGap, (Control)speedGraph };
@@ -211,7 +211,7 @@ namespace Netlane {
                 timeRow, downRow, upRow, ipRow, idleHint, lastSession,
                 graphGap, speedGraph, Spacer(6),
                 SectionCaption("Маршрут и защита"), Spacer(4),
-                Pair("Набор правил", setButton, 34, 160), Pair("Транспорт", transportSwitch, 32, 184), Pair("DNS", dnsValue, 28, 160), Pair("Kill Switch", killSwitch, 28, 60)
+                Pair("Набор правил", setButton, 34, 160), Pair("Транспорт", transportSwitch, 32, 196), Pair("DNS", dnsValue, 28, 160), Pair("Kill Switch", killSwitch, 28, 60)
             };
             for (int i = session.Length - 1; i >= 0; i--) sessionPane.Controls.Add(session[i]);
 
@@ -481,7 +481,7 @@ namespace Netlane {
             idleHint.Text = Selected == null ? "" : state.HidePublicIp ? "VPN выключен: трафик идёт напрямую." : "VPN выключен: сайты видят ваш обычный IP.";
             if (state.LastSessionEnd == null) { lastSession.Text = ""; tips.SetToolTip(lastSession, ""); }
             else {
-                lastSession.Text = "Последняя сессия: " + HumanDuration(state.LastSessionSeconds) + (state.LastSessionDown > 0 || state.LastSessionUp > 0 ? " · ↓ " + SessionStats.FormatBytes(state.LastSessionDown) + " · ↑ " + SessionStats.FormatBytes(state.LastSessionUp) : "");
+                lastSession.Text = "Последняя сессия: " + HumanDuration(state.LastSessionSeconds) + (state.LastSessionDown > 0 || state.LastSessionUp > 0 ? "\n↓ " + SessionStats.FormatBytes(state.LastSessionDown) + " · ↑ " + SessionStats.FormatBytes(state.LastSessionUp) : "");
                 DateTime end; string when = DateTime.TryParse(state.LastSessionEnd, null, System.Globalization.DateTimeStyles.RoundtripKind, out end) ? end.ToLocalTime().ToString("d MMMM, HH:mm", new System.Globalization.CultureInfo("ru-RU")) : "";
                 tips.SetToolTip(lastSession, (state.LastSessionServer ?? "") + (when.Length > 0 ? ", закончилась " + when : ""));
             }
