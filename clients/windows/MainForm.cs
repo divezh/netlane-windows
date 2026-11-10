@@ -192,7 +192,7 @@ namespace Netlane {
             setButton.AccessibleName = "Набор правил";
             Control[] session = {
                 SectionCaption("Сессия"), Spacer(4),
-                Pair("Время", clock, 24, 190), Pair("Принято", received, 24, 190), Pair("Отправлено", sent, 24, 190),
+                Pair("Время", clock, 24, 150), Pair("Принято", received, 24, 150), Pair("Отправлено", sent, 24, 150),
                 Spacer(8), speedGraph, graphFoot, Spacer(12),
                 SectionCaption("Маршрут и защита"), Spacer(4),
                 Pair("Набор правил", setButton, 36, 160), Pair("DNS", dnsValue, 30, 160), Pair("Kill Switch", killSwitch, 30, 60)

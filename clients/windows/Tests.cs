@@ -125,6 +125,7 @@ namespace Netlane {
                 Check(all.Any(c=>c is Label&&c.Visible&&c.Text=="↑ 210,0 МБ")&&all.Any(c=>c is Label&&c.Visible&&c.Text=="↓ 1,8 ГБ"),"Connected: sent and received in the session rows.");
                 LocationsTable table=(LocationsTable)all.First(c=>c is LocationsTable);
                 Check(table.Visible&&table.RowCount==2&&table.SelectedName=="Амстердам","Two locations: both are rows of the table: "+table.RowCount);
+                if(Type.GetType("Mono.Runtime")==null)foreach(string caption in new[]{"Время","Принято","Отправлено","Набор правил","Kill Switch"}){Label label=all.OfType<Label>().FirstOrDefault(c=>c.Text==caption);Check(label!=null&&TextRenderer.MeasureText(label.Text,label.Font).Width<=label.Width,"Session caption fits in Inter: "+caption+(label==null?"":" "+TextRenderer.MeasureText(label.Text,label.Font).Width+"/"+label.Width));}
                 if(Type.GetType("Mono.Runtime")==null)Check(f.PeakFitsForTests,"The peak line under the speed lanes fits its column.");
                 Check(!all.Any(c=>c is LinkLabel&&c.Visible&&(c.Text=="Проверить пинг"||c.Text=="Добавить ссылку…")),"Ping check and adding live in the table, not as links under it.");
                 Check(table.AddRowBounds.Bottom<=table.Height&&table.RefreshBounds.Right<=table.Width,"The add row and the refresh glyph fit the table: "+table.AddRowBounds+" / "+table.RefreshBounds);
