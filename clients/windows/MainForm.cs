@@ -22,7 +22,7 @@ namespace Netlane {
         // Account and feed line at the bottom of the navigation; a click refreshes the subscription.
         readonly SubscriptionRow subscriptionRow = new SubscriptionRow { Dock = DockStyle.Bottom, Height = 54, Margin = new Padding(0) };
         readonly StatusBlock statusBlock = new StatusBlock { Dock = DockStyle.Fill, Margin = new Padding(0), AlignLeft = true };
-        readonly SpeedGraph speedGraph = new SpeedGraph { Dock = DockStyle.Top, Height = 84, Margin = new Padding(0) };
+        readonly SpeedGraph speedGraph = new SpeedGraph { Dock = DockStyle.Top, Height = 80, Margin = new Padding(0) };
         readonly LocationsTable table = new LocationsTable { Dock = DockStyle.Fill, Margin = new Padding(0) };
         readonly TryCard tryCard = new TryCard { Dock = DockStyle.Top, Height = 104, Margin = new Padding(0) };
         readonly LogPreview logPreview = new LogPreview { Dock = DockStyle.Top, Height = 96, Margin = new Padding(0) };
@@ -195,10 +195,10 @@ namespace Netlane {
             setButton.AccessibleName = "Набор правил";
             Control[] session = {
                 SectionCaption("Сессия"), Spacer(4),
-                Pair("Время", clock, 24, 150), Pair("Принято", received, 24, 150), Pair("Отправлено", sent, 24, 150),
-                Spacer(6), speedGraph, graphFoot, Spacer(8),
+                Pair("Время", clock, 22, 150), Pair("Принято", received, 22, 150), Pair("Отправлено", sent, 22, 150),
+                Spacer(6), speedGraph, graphFoot, Spacer(6),
                 SectionCaption("Маршрут и защита"), Spacer(4),
-                Pair("Набор правил", setButton, 34, 160), Pair("Транспорт", transportSwitch, 32, 160), Pair("DNS", dnsValue, 30, 160), Pair("Kill Switch", killSwitch, 30, 60)
+                Pair("Набор правил", setButton, 34, 160), Pair("Транспорт", transportSwitch, 32, 160), Pair("DNS", dnsValue, 28, 160), Pair("Kill Switch", killSwitch, 28, 60)
             };
             for (int i = session.Length - 1; i >= 0; i--) sessionPane.Controls.Add(session[i]);
 
