@@ -275,13 +275,68 @@ namespace Netlane {
     internal sealed class NavItem : ThemedControl {
         bool selected;
         internal bool Selected { get { return selected; } set { selected = value; Invalidate(); } }
+        // Page id from MainForm.NavIds; picks the glyph drawn before the title. Null draws none.
+        internal string Glyph;
         internal NavItem() { Font = Theme.Font(Theme.BodySize + 0.75f); Margin = new Padding(0, 0, 0, 2); }
         protected override void OnPaint(PaintEventArgs args) {
             Graphics g = Prepare(args);
             Rectangle box = new Rectangle(0, 1, Width - 1, Height - 3);
             if (selected || Hover) using (GraphicsPath path = Shapes.Round(box, Theme.Px(g, 9))) using (Brush fill = new SolidBrush(selected ? Theme.AccentSoft : Theme.Card)) g.FillPath(fill, path);
-            TextRenderer.DrawText(g, Text, Font, new Rectangle(box.X + (int)Theme.Px(g, 12), box.Y, box.Width, box.Height), selected ? Theme.Ink : Theme.Muted, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+            int textLeft = box.X + (int)Theme.Px(g, 12);
+            if (Glyph != null) {
+                float size = Theme.Px(g, 18);
+                NavGlyphs.Draw(g, Glyph, new RectangleF(textLeft, box.Y + (box.Height - size) / 2f, size, size), selected ? Theme.Accent : Hover ? Theme.Muted : Theme.Faint);
+                textLeft += (int)(size + Theme.Px(g, 10));
+            }
+            TextRenderer.DrawText(g, Text, Font, new Rectangle(textLeft, box.Y, box.Right - textLeft, box.Height), selected ? Theme.Ink : Theme.Muted, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
             if (ShowFocus) using (Pen focus = new Pen(Theme.Accent)) using (GraphicsPath path = Shapes.Round(box, Theme.Px(g, 9))) g.DrawPath(focus, path);
+        }
+    }
+    // Line icons of the navigation, drawn on an 18 × 18 grid so they stay sharp at any DPI.
+    internal static class NavGlyphs {
+        internal static void Draw(Graphics g, string id, RectangleF box, Color color) {
+            float u = box.Width / 18f, x0 = box.X, y0 = box.Y;
+            Func<float, float, PointF> P = (x, y) => new PointF(x0 + x * u, y0 + y * u);
+            GraphicsState saved = g.Save(); g.SmoothingMode = SmoothingMode.AntiAlias;
+            using (Pen pen = new Pen(color, 1.5f * u) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+            using (Brush dot = new SolidBrush(color)) {
+                switch (id) {
+                    case "home": // power
+                        g.DrawArc(pen, x0 + 2.5f * u, y0 + 3f * u, 13f * u, 13f * u, -50, 280);
+                        g.DrawLine(pen, P(9, 1.5f), P(9, 8.5f));
+                        break;
+                    case "rules": // one road splitting in two
+                        g.DrawLine(pen, P(9, 16.5f), P(9, 10));
+                        g.DrawLines(pen, new[] { P(3, 2.5f), P(3, 4.5f), P(9, 10), P(15, 4.5f), P(15, 2.5f) });
+                        g.DrawLines(pen, new[] { P(1.2f, 4.3f), P(3, 2.5f), P(4.8f, 4.3f) });
+                        g.DrawLines(pen, new[] { P(13.2f, 4.3f), P(15, 2.5f), P(16.8f, 4.3f) });
+                        break;
+                    case "servers": // two rack units
+                        foreach (float top in new[] { 2f, 10f }) {
+                            using (GraphicsPath unit = Shapes.Round(new RectangleF(x0 + 2 * u, y0 + top * u, 14 * u, 6 * u), 1.8f * u)) g.DrawPath(pen, unit);
+                            g.FillEllipse(dot, x0 + 4.3f * u, y0 + (top + 2.3f) * u, 1.6f * u, 1.6f * u);
+                            g.DrawLine(pen, P(8.5f, top + 3), P(13, top + 3));
+                        }
+                        break;
+                    case "connection": // sliders
+                        float[][] rows = { new[] { 4f, 6f }, new[] { 9f, 12f }, new[] { 14f, 5f } };
+                        foreach (float[] row in rows) {
+                            g.DrawLine(pen, P(2, row[0]), P(16, row[0]));
+                            using (Brush hole = new SolidBrush(Theme.Ground)) g.FillEllipse(hole, x0 + (row[1] - 2) * u, y0 + (row[0] - 2) * u, 4 * u, 4 * u);
+                            g.DrawEllipse(pen, x0 + (row[1] - 2) * u, y0 + (row[0] - 2) * u, 4 * u, 4 * u);
+                        }
+                        break;
+                    case "log": // list
+                        foreach (float y in new[] { 4f, 9f, 14f }) { g.FillEllipse(dot, x0 + 1.8f * u, y0 + (y - 1) * u, 2 * u, 2 * u); g.DrawLine(pen, P(6.5f, y), P(16, y)); }
+                        break;
+                    case "about": // info
+                        g.DrawEllipse(pen, x0 + 1.5f * u, y0 + 1.5f * u, 15 * u, 15 * u);
+                        g.FillEllipse(dot, x0 + 8.1f * u, y0 + 4.8f * u, 1.8f * u, 1.8f * u);
+                        g.DrawLine(pen, P(9, 8.5f), P(9, 13));
+                        break;
+                }
+            }
+            g.Restore(saved);
         }
     }
     // Row with a hairline under it (and over the first row), no card.

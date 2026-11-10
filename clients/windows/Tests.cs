@@ -129,6 +129,7 @@ namespace Netlane {
                 Check(f.Size.Width==920&&f.Size.Height==560,"Default window is 920 × 560: "+f.Size);
                 List<NavItem> items=all.OfType<NavItem>().Where(c=>c.Visible).ToList();
                 Check(items.Count==MainForm.NavIds.Length&&items.Single(c=>c.Selected).Text=="Подключение","Navigation: six pages, «Подключение» first: "+items.Count);
+                Check(items.All(c=>c.Glyph==(string)c.Tag),"Every navigation item draws its own icon.");
                 Size normal=f.ClientSize;
                 foreach(Size size in new[]{normal,new Size(860,520),new Size(1200,760),normal}) {
                     if(size==normal)f.ClientSize=size;else f.Size=size;Application.DoEvents();
@@ -143,6 +144,8 @@ namespace Netlane {
                     bool mono=Type.GetType("Mono.Runtime")!=null;
                     if(!mono)foreach(ToolStripItem item in menu.Items)if(item is ToolStripMenuItem)
                         Check(item.Bounds.Right>=menu.ClientSize.Width-2,"Routing menu row must reach the right edge: "+item.Bounds+" / "+menu.ClientSize);
+                    ToolStripItem manage=menu.Items[menu.Items.Count-1];
+                    Check(manage.Text=="Настроить наборы…"&&manage.ForeColor==Theme.Muted&&menu.Items[menu.Items.Count-2] is ToolStripSeparator,"«Настроить наборы…» is a quiet action under a separator.");
                     menu.Close();Application.DoEvents();
                 }
                 DarkButton routing=(DarkButton)all.First(c=>c is DarkButton&&c.AccessibleName=="Набор правил");

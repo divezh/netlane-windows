@@ -6,13 +6,13 @@ using System.Threading;
 using System.Reflection;
 using System.Windows.Forms;
 
-[assembly: AssemblyVersion("0.6.3.0")]
-[assembly: AssemblyFileVersion("0.6.3.0")]
+[assembly: AssemblyVersion("0.6.4.0")]
+[assembly: AssemblyFileVersion("0.6.4.0")]
 [assembly: AssemblyProduct("Netlane Connect")]
 
 namespace Netlane {
     internal static class Program {
-        internal const string Version = "0.6.3";
+        internal const string Version = "0.6.4";
         internal const string ProductName = "Netlane Connect";
         internal static bool Rendering;
         // Autostart runs «Netlane.exe --tray»: a normal start with the window hidden in the tray.
@@ -54,6 +54,17 @@ namespace Netlane {
                         preview.Show(); Application.DoEvents();
                         string dump = Environment.GetEnvironmentVariable("NETLANE_LAYOUT_DUMP");
                         if (!String.IsNullOrEmpty(dump)) DumpLayout(preview, dump);
+                        // A popup menu is a separate window: take it from the screen, DWM corners and shadow included.
+                        if (request.Page == "routing-menu") {
+                            preview.Activate(); ((MainForm)preview).OpenRoutingMenuForPreview();
+                            for (int i = 0; i < 10; i++) { Application.DoEvents(); Thread.Sleep(50); }
+                            Rectangle screen = preview.RectangleToScreen(preview.ClientRectangle);
+                            using (Bitmap shot = new Bitmap(screen.Width, screen.Height)) {
+                                using (Graphics g = Graphics.FromImage(shot)) g.CopyFromScreen(screen.Location, Point.Empty, screen.Size);
+                                shot.Save(request.Output);
+                            }
+                            return 0;
+                        }
                         // Only the client area: DrawToBitmap paints the window frame in the classic style,
                         // which is not what Windows 10 and 11 show.
                         using (Bitmap bitmap = new Bitmap(preview.Width, preview.Height)) {
@@ -112,7 +123,7 @@ namespace Netlane {
         internal string Page = "home";
         internal ConnectionView? State;
         internal string Host;
-        internal static readonly string[] Pages = { "home", "settings", "import", "no-servers", "many-sets", "servers-menu", "subscribed", "servers", "rules", "connection", "about", "log", "one-server", "three-servers", "six-servers", "ten-servers", "account", "account-servers", "expired" };
+        internal static readonly string[] Pages = { "home", "settings", "import", "no-servers", "many-sets", "servers-menu", "subscribed", "servers", "rules", "connection", "about", "log", "one-server", "three-servers", "six-servers", "ten-servers", "account", "account-servers", "expired", "routing-menu" };
         internal bool Settings;
         internal static PreviewRequest Parse(string[] args) {
             if (args == null || args.Length == 0) return null;

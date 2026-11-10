@@ -154,7 +154,7 @@ namespace Netlane {
             side.Controls.Add(subscriptionRow);
             for (int i = NavIds.Length - 1; i >= 0; i--) {
                 string id = NavIds[i];
-                NavItem item = new NavItem { Text = NavTitles[i], Dock = DockStyle.Top, Height = 36, Tag = id };
+                NavItem item = new NavItem { Text = NavTitles[i], Dock = DockStyle.Top, Height = 36, Tag = id, Glyph = id };
                 item.Click += delegate { Navigate(id); };
                 nav.Insert(0, item); side.Controls.Add(item);
             }
@@ -230,7 +230,9 @@ namespace Netlane {
 
             // The version sits in the footer; the same line carries a way to the engine log when
             // something went wrong, an update offer when there is one, and the encryption cue otherwise.
-            TableLayoutPanel footer = new TableLayoutPanel { Dock = DockStyle.Bottom, Height = 22, ColumnCount = 3, RowCount = 1, Margin = new Padding(0), BackColor = Theme.Ground };
+            TableLayoutPanel footer = new TableLayoutPanel { Dock = DockStyle.Bottom, Height = 31, ColumnCount = 3, RowCount = 1, Margin = new Padding(0), Padding = new Padding(0, 9, 0, 0), BackColor = Theme.Ground };
+            // A hairline keeps the version line apart from «Проверить пинг» above it.
+            footer.Paint += delegate(object sender, PaintEventArgs args) { using (Pen line = new Pen(Theme.Line)) args.Graphics.DrawLine(line, 0, 4, footer.Width, 4); };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             Label version = new Label { Text = "v" + Program.Version, AutoSize = true, Font = Theme.Font(Theme.CaptionSize), ForeColor = Theme.Faint, Anchor = AnchorStyles.Left, Margin = new Padding(0) };
             footerNote = new Label { Text = "Профиль зашифрован Windows", AutoSize = true, Font = Theme.Font(Theme.CaptionSize), ForeColor = Theme.Faint, Anchor = AnchorStyles.Right, Margin = new Padding(0) };
@@ -346,7 +348,7 @@ namespace Netlane {
             }
             RuleSet mine = demo.AddRuleSet("Мои правила", new Routing { Mode = "selective", Destinations = new List<string> { "mos.ru", "*.mos.ru" } });
             demo.SelectedRuleSetId = mine.Id;
-            if (page == "many-sets") foreach (string name in new[] { "Офис", "Стриминг", "Банки", "Игры" }) demo.AddRuleSet(name, new Routing());
+            if (page == "many-sets" || page == "routing-menu") foreach (string name in new[] { "Офис", "Стриминг", "Банки", "Игры" }) demo.AddRuleSet(name, new Routing());
             // A feed refreshed a couple of hours ago: the subscription line needs a demo state to be seen.
             if (page == "subscribed" || page == "ten-servers" || page == "account" || page == "account-servers") {
                 Subscription sub = demo.AddSubscription("https://ams.example.com/abcdefghijklmnopqrstuvwxyz/sub/demo");
@@ -568,13 +570,15 @@ namespace Netlane {
                 menu.Items.Add(item);
             }
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Настроить наборы…", null, delegate { OpenSettings("rules"); });
+            ToolStripItem manage = menu.Items.Add("Настроить наборы…", null, delegate { OpenSettings("rules"); });
+            manage.ForeColor = Theme.Muted;
             return menu;
         }
+        internal void OpenRoutingMenuForPreview() { OpenRoutingMenu(); }
         void OpenRoutingMenu() {
             ContextMenuStrip menu = BuildRoutingMenu();
             menu.Closed += delegate { BeginInvoke((Action)menu.Dispose); };
-            menu.Show(setButton, new Point(0, setButton.Height));
+            menu.Show(setButton, new Point(0, setButton.Height + 4));
         }
         void SaveState() {
             if (previewOnly) return;

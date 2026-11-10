@@ -311,19 +311,18 @@ namespace Netlane {
             base.OnClick(args);
             if (!Enabled || Items.Count == 0) return;
             BuildMenu();
-            menu.Show(this, new Point(0, Height));
+            menu.Show(this, new Point(0, Height + 4));
         }
         protected override void Dispose(bool disposing) { if (disposing && menu != null) { menu.Dispose(); menu = null; } base.Dispose(disposing); }
     }
+    // Dark popup menu in the app's style: rounded rows, the chosen row tinted with the accent,
+    // rounded window corners and a themed border from DWM on Windows 11, a drawn border elsewhere.
     internal sealed class DarkMenuRenderer : ToolStripProfessionalRenderer {
         internal static ContextMenuStrip CreateMenu(int minimumWidth) {
             ContextMenuStrip menu = new ContextMenuStrip {
                 BackColor = Theme.Card, ForeColor = Theme.Ink, Font = Theme.Font(Theme.BodySize),
                 ShowImageMargin = false, ShowCheckMargin = true, Renderer = new DarkMenuRenderer(),
-                Padding = new Padding(4), MinimumSize = new Size(minimumWidth, 0)
-            };
-            menu.ItemAdded += delegate(object sender, ToolStripItemEventArgs args) {
-                if (args.Item is ToolStripMenuItem) args.Item.Padding = new Padding(6, 6, 14, 6);
+                Padding = new Padding(4, 5, 4, 5), MinimumSize = new Size(minimumWidth, 0)
             };
             menu.Layout += delegate {
                 // DisplayRectangle excludes the check gutter; item bounds already include it.
@@ -335,15 +334,41 @@ namespace Netlane {
             };
             return menu;
         }
+        bool systemBorder;
         public DarkMenuRenderer() { RoundedEdges = false; }
+        protected override void Initialize(ToolStrip strip) {
+            base.Initialize(strip);
+            strip.ItemAdded += delegate(object sender, ToolStripItemEventArgs args) {
+                if (args.Item is ToolStripMenuItem) args.Item.Padding = new Padding(6, 7, 18, 7);
+                else if (args.Item is ToolStripSeparator) args.Item.Margin = new Padding(0, 3, 0, 3);
+            };
+            strip.HandleCreated += delegate {
+                try {
+                    int round = 3; // DWMWCP_ROUNDSMALL
+                    int border = ColorTranslator.ToWin32(Theme.LineStrong);
+                    systemBorder = Native.DwmSetWindowAttribute(strip.Handle, 33, ref round, sizeof(int)) == 0
+                        && Native.DwmSetWindowAttribute(strip.Handle, 34, ref border, sizeof(int)) == 0;
+                } catch (DllNotFoundException) { } catch (EntryPointNotFoundException) { }
+            };
+        }
         protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs args) { args.Graphics.Clear(Theme.Card); }
         protected override void OnRenderImageMargin(ToolStripRenderEventArgs args) { using (Brush fill = new SolidBrush(Theme.Card)) args.Graphics.FillRectangle(fill, args.AffectedBounds); }
         protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs args) {
-            using (Brush fill = new SolidBrush(args.Item.Selected && args.Item.Enabled ? Theme.Raised : Theme.Card)) args.Graphics.FillRectangle(fill, new Rectangle(Point.Empty, args.Item.Size));
+            Graphics g = args.Graphics; Rectangle all = new Rectangle(Point.Empty, args.Item.Size);
+            using (Brush fill = new SolidBrush(Theme.Card)) g.FillRectangle(fill, all);
+            ToolStripMenuItem menuItem = args.Item as ToolStripMenuItem;
+            bool chosen = menuItem != null && menuItem.Checked, hot = args.Item.Selected && args.Item.Enabled;
+            if (!chosen && !hot) return;
+            float scale = g.DpiX / 96f;
+            RectangleF row = new RectangleF(2 * scale, 1, all.Width - 4 * scale - 1, all.Height - 2);
+            GraphicsState saved = g.Save(); g.SmoothingMode = SmoothingMode.AntiAlias;
+            Color color = chosen ? (hot ? Theme.Blend(Theme.Accent, Theme.Card, 44) : Theme.Selection) : Theme.Raised;
+            using (GraphicsPath path = Shapes.Round(row, 6 * scale)) using (Brush fill = new SolidBrush(color)) g.FillPath(fill, path);
+            g.Restore(saved);
         }
         protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs args) {
             Rectangle box = args.ImageRectangle;
-            float scale = args.Graphics.DpiX / 96f, x = box.Left + box.Width / 2f, y = box.Top + box.Height / 2f;
+            float scale = args.Graphics.DpiX / 96f, x = box.Left + box.Width / 2f + scale, y = box.Top + box.Height / 2f;
             GraphicsState saved = args.Graphics.Save(); args.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using (Pen tick = new Pen(args.Item.Enabled ? Theme.Accent : Theme.Muted, 1.8f * scale) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
                 args.Graphics.DrawLines(tick, new[] { new PointF(x - 4 * scale, y), new PointF(x - scale, y + 3 * scale), new PointF(x + 5 * scale, y - 4 * scale) });
@@ -351,10 +376,19 @@ namespace Netlane {
         }
         protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs args) {
             using (Brush fill = new SolidBrush(Theme.Card)) args.Graphics.FillRectangle(fill, new Rectangle(Point.Empty, args.Item.Size));
-            using (Pen line = new Pen(Theme.Line)) args.Graphics.DrawLine(line, 8, args.Item.Height / 2, args.Item.Width - 9, args.Item.Height / 2);
+            float scale = args.Graphics.DpiX / 96f;
+            using (Pen line = new Pen(Theme.Line)) args.Graphics.DrawLine(line, (int)(10 * scale), args.Item.Height / 2, args.Item.Width - (int)(11 * scale), args.Item.Height / 2);
         }
-        protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs args) { args.TextColor = args.Item.Enabled ? Theme.Ink : Theme.Muted; base.OnRenderItemText(args); }
+        // An item may ask for a quieter colour (actions under a separator); disabled items always fade.
+        protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs args) {
+            ToolStripMenuItem menuItem = args.Item as ToolStripMenuItem;
+            args.TextColor = !args.Item.Enabled ? Theme.Faint : args.Item.Selected || (menuItem != null && menuItem.Checked) ? Theme.Ink : args.Item.ForeColor;
+            base.OnRenderItemText(args);
+        }
         protected override void OnRenderArrow(ToolStripArrowRenderEventArgs args) { args.ArrowColor = args.Item.Enabled ? Theme.Ink : Theme.Muted; base.OnRenderArrow(args); }
-        protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs args) { using (Pen edge = new Pen(Theme.LineStrong)) args.Graphics.DrawRectangle(edge, 0, 0, args.ToolStrip.Width - 1, args.ToolStrip.Height - 1); }
+        protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs args) {
+            if (systemBorder) return;
+            using (Pen edge = new Pen(Theme.LineStrong)) args.Graphics.DrawRectangle(edge, 0, 0, args.ToolStrip.Width - 1, args.ToolStrip.Height - 1);
+        }
     }
 }
