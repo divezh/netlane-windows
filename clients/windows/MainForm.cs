@@ -574,11 +574,13 @@ namespace Netlane {
             manage.ForeColor = Theme.Muted;
             return menu;
         }
-        internal void OpenRoutingMenuForPreview() { OpenRoutingMenu(); }
-        void OpenRoutingMenu() {
+        internal ContextMenuStrip OpenRoutingMenuForPreview() { return OpenRoutingMenu(); }
+        ContextMenuStrip OpenRoutingMenu() {
             ContextMenuStrip menu = BuildRoutingMenu();
             menu.Closed += delegate { BeginInvoke((Action)menu.Dispose); };
-            menu.Show(setButton, new Point(0, setButton.Height + 4));
+            // Right edges line up: the menu may be wider than the button and must not leave the window.
+            menu.Show(setButton, new Point(setButton.Width, setButton.Height + 4), ToolStripDropDownDirection.BelowLeft);
+            return menu;
         }
         void SaveState() {
             if (previewOnly) return;

@@ -56,9 +56,9 @@ namespace Netlane {
                         if (!String.IsNullOrEmpty(dump)) DumpLayout(preview, dump);
                         // A popup menu is a separate window: take it from the screen, DWM corners and shadow included.
                         if (request.Page == "routing-menu") {
-                            preview.Activate(); ((MainForm)preview).OpenRoutingMenuForPreview();
+                            preview.Activate(); ContextMenuStrip menu = ((MainForm)preview).OpenRoutingMenuForPreview();
                             for (int i = 0; i < 10; i++) { Application.DoEvents(); Thread.Sleep(50); }
-                            Rectangle screen = preview.RectangleToScreen(preview.ClientRectangle);
+                            Rectangle screen = Rectangle.Union(preview.RectangleToScreen(preview.ClientRectangle), Rectangle.Inflate(menu.Bounds, 16, 16));
                             using (Bitmap shot = new Bitmap(screen.Width, screen.Height)) {
                                 using (Graphics g = Graphics.FromImage(shot)) g.CopyFromScreen(screen.Location, Point.Empty, screen.Size);
                                 shot.Save(request.Output);
