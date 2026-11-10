@@ -473,7 +473,7 @@ namespace Netlane {
             string tip;
             if (state.HidePublicIp) { ipValue.Text = "не проверяется"; ipValue.ForeColor = Theme.Faint; tip = "Проверка внешнего IP выключена в «Настройках»."; }
             else if (Live && view != ConnectionView.Connected) { ipValue.Text = Blank; ipValue.ForeColor = Theme.Ink; tip = ""; }
-            else if (Live && state.SelectedRuleSet.Routing.Mode != "general") { ipValue.Text = "зависит от сайта"; ipValue.ForeColor = Theme.Muted; tip = "Через VPN идут только адреса набора «" + state.SelectedRuleSet.DisplayName + "», остальные сайты видят ваш обычный IP."; }
+            else if (Live && state.SelectedRuleSet.Routing.Mode != "general") { ipValue.Text = "только для «" + state.SelectedRuleSet.DisplayName + "»"; ipValue.ForeColor = Theme.Muted; tip = "Через VPN идут только адреса набора «" + state.SelectedRuleSet.DisplayName + "»: эти сайты видят IP сервера, остальные — ваш обычный IP."; }
             else if (ipChecking || (publicIp != null && ipThroughVpn != (view == ConnectionView.Connected))) { ipValue.Text = "проверяю…"; ipValue.ForeColor = Theme.Faint; tip = ""; }
             else if (publicIp == null) { ipValue.Text = ipFailed ? "не удалось проверить" : Blank; ipValue.ForeColor = Theme.Faint; tip = ipFailed ? "Щёлкните, чтобы проверить ещё раз." : ""; }
             else { ipValue.Text = publicIp.Text; ipValue.ForeColor = Theme.Ink; tip = (ipThroughVpn ? "Так вас видят сайты: адрес VPN-сервера." : "Так вас видят сайты: VPN выключен.") + "\nПроверено через cloudflare.com. Щёлкните, чтобы проверить ещё раз."; }
