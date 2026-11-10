@@ -84,7 +84,8 @@ namespace Netlane {
             try {
                 if (String.IsNullOrEmpty(target) || !File.Exists(Path.Combine(target, "Netlane.exe"))) { Note("apply: no Netlane.exe in " + target); return 2; }
                 if (String.Equals(Path.GetFullPath(source), Path.GetFullPath(target), StringComparison.OrdinalIgnoreCase)) { Note("apply: source is the target"); return 2; }
-                try { using (Process parent = Process.GetProcessById(parentPid)) parent.WaitForExit(60000); } catch (ArgumentException) { } catch (InvalidOperationException) { }
+                // Gone already, or not ours to wait for (access denied): either way go on.
+                try { using (Process parent = Process.GetProcessById(parentPid)) parent.WaitForExit(60000); } catch (Exception) { }
                 WaitForExit("Netlane", 30000); WaitForExit("trusttunnel_client", 30000);
                 Exception last = null;
                 for (int attempt = 0; attempt < 15; attempt++) {
