@@ -183,7 +183,8 @@ namespace Netlane {
             // Right column: the session, then the route and protection of the next connection.
             sessionPane = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Ground, Margin = new Padding(0) };
             TableLayoutPanel graphFoot = new TableLayoutPanel { Dock = DockStyle.Top, Height = 18, ColumnCount = 2, RowCount = 1, Margin = new Padding(0), BackColor = Theme.Ground };
-            graphFoot.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); graphFoot.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            // The peak names both directions and needs most of the width.
+            graphFoot.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 74)); graphFoot.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             graphFoot.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             graphPeak.TextAlign = ContentAlignment.MiddleRight;
             graphFoot.Controls.Add(TextLabel("60 секунд", Theme.CaptionSize, Theme.Faint), 0, 0); graphFoot.Controls.Add(graphPeak, 1, 0);
@@ -619,6 +620,7 @@ namespace Netlane {
             pingNote.Text = "Пинг проверен " + (age < 60 ? "только что" : age < 3600 ? ((int)(age / 60)) + " мин назад" : age < 86400 ? ((int)(age / 3600)) + " ч назад" : lastPingCheck.ToLocalTime().ToString("dd.MM HH:mm"));
         }
         internal string PingNoteForTests { get { return pingNote.Text; } }
+        internal bool PeakFitsForTests { get { return graphPeak.Text.Length > 0 && TextRenderer.MeasureText(graphPeak.Text, graphPeak.Font).Width <= graphPeak.Width; } }
         async Task ProbeLatency() {
             Server server = Selected;
             if (measuring || server == null || previewOnly) return;
