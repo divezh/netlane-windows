@@ -99,4 +99,4 @@ Smart App Control может блокировать неизвестные пр�
 
 ## Лицензии
 
-Собственный код Netlane распространяется под [лицензией MIT](LICENSE). Код TrustTunnel и Wintun распространяются на условиях соответствующих правообладателей, флаги — [Twemoji](https://github.com/twitter/twemoji) (CC-BY 4.0), шрифт — [Onest](https://github.com/googlefonts/onest) (SIL OFL 1.1). Тексты лицензий зависимостей входят в готовый архив; лицензия флагов также хранится в `clients/windows/licenses/`.
+Собственный код Netlane распространяется под [лицензией MIT](LICENSE). Код TrustTunnel и Wintun распространяются на условиях соответствующих правообладателей, флаги — [Twemoji](https://github.com/twitter/twemoji) (CC-BY 4.0). Тексты лицензий зависимостей входят в готовый архив; лицензия флагов также хранится в `clients/windows/licenses/`.

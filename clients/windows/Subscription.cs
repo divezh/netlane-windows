@@ -58,7 +58,8 @@ namespace Netlane {
             return uri.Scheme == Uri.UriSchemeHttps && uri.Host.Length > 0 && Regex.IsMatch(uri.AbsolutePath, @"/sub/[A-Za-z0-9_-]+\z") && String.IsNullOrEmpty(uri.UserInfo);
         }
         // What the settings show under the subscription's name.
-        internal string DisplayName { get { return String.IsNullOrEmpty(Name) ? new Uri(Url).Host : Name; } }
+        // A panel name may start with a flag emoji ("🇵🇱 Warsaw"); Windows draws it as two letters, so it is dropped.
+        internal string DisplayName { get { string country, name; ServerName.Split(Name, out country, out name); return String.IsNullOrEmpty(name) ? new Uri(Url).Host : name; } }
     }
 
     // A parsed subscription response; every server is checked like an imported tt:// link.

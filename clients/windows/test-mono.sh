@@ -8,7 +8,6 @@ out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 refs=(-r:System.dll -r:System.Core.dll -r:System.Drawing.dll -r:System.Windows.Forms.dll -r:System.Security.dll -r:System.Web.Extensions.dll)
 res=(-resource:Netlane.ico,Netlane.ico -resource:../../web/icon.png,Netlane.png)
-for f in fonts/*.ttf; do res+=("-resource:$f,font.$(basename "$f")"); done
 if [[ -d flags ]]; then for f in flags/*.png; do res+=("-resource:$f,flag.$(basename "$f")"); done; fi
 mapfile -t app < <(ls ./*.cs | grep -v '/Tests.cs$')
 mcs -nologo -langversion:5 -platform:x64 -target:winexe "${res[@]}" -out:"$out/app.exe" "${refs[@]}" "${app[@]}" 2>&1 | grep -v 'warning CS'

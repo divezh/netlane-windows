@@ -23,16 +23,6 @@ Prebuilt Binaries License; полный текст: `licenses/WINTUN_LICENSE.txt
 
 - https://www.wintun.net/
 
-## Onest
-
-Шрифт интерфейса — Onest, Copyright 2021 The Onest Project Authors, лицензия
-SIL Open Font License 1.1. В приложение встроены начертания Regular (400) и SemiBold (600),
-полученные из вариативного шрифта, сокращённые до латиницы, кириллицы и нужных знаков
-и прохинтованные ttfautohint (`clients/windows/fonts`).
-
-- https://github.com/googlefonts/onest
-- Полный текст: `licenses/ONEST_LICENSE.txt` в собранном архиве.
-
 ## Twemoji
 
 Флаги стран в интерфейсе — графика Twemoji, Copyright 2020 Twitter, Inc and other

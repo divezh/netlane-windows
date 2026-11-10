@@ -171,7 +171,6 @@ namespace Netlane {
                 Check(action.Kind==ButtonKind.Primary,"Idle: the action is the primary «Подключиться».");
                 Check(all.OfType<StatusBlock>().Any(c=>c.Visible&&c.Title=="Не подключено"),"Idle status.");
                 Check(!all.Any(c=>c is Label&&c.Visible&&(c.Text.StartsWith("↓ ")||c.Text.StartsWith("↑ "))),"Idle: no traffic in the session rows.");
-                if(Type.GetType("Mono.Runtime")==null){using(Font body=Theme.Font(10f))using(Font strong=Theme.Font(10f,true))Check(AppFonts.Embedded&&body.Name=="Onest"&&strong.Name=="Onest SemiBold","The interface font is the embedded Onest: "+body.Name+" / "+strong.Name);}
                 SpeedGraph lanes=new SpeedGraph(); lanes.Push(2048,100); lanes.Push(4096,300);
                 Check(lanes.SampleCount==2&&lanes.Peak==4096&&lanes.UpPeak==300&&lanes.Last(true)==300&&lanes.Last(false)==4096,"Speed lanes keep receive and send apart.");
                 lanes.Dispose();
@@ -478,6 +477,7 @@ namespace Netlane {
         static void ImportTests() {
             string c,n;ServerName.Split("\U0001F1F3\U0001F1F1 Амстердам",out c,out n);Check(c=="NL"&&n=="Амстердам","Flag split.");
             ServerName.Split("Амстердам",out c,out n);Check(c==null&&n=="Амстердам","No flag.");
+            Check(new Subscription{Name="\U0001F1F5\U0001F1F1 Warsaw",Url="https://panel.example/sub/abc"}.DisplayName=="Warsaw"&&new Subscription{Name="\U0001F1F5\U0001F1F1",Url="https://panel.example/sub/abc"}.DisplayName=="panel.example","A subscription name drops the flag emoji; a bare flag falls back to the host.");
             ServerName.Split("\U0001F1F3 Амстердам",out c,out n);Check(c==null&&n=="\U0001F1F3 Амстердам","Lone indicator kept.");
             ServerName.Split("\U0001F1FF\U0001F1FF Test",out c,out n);Check(c=="ZZ"&&n=="Test","Unknown code still parsed; drawing falls back.");
             ServerName.Split("\U0001F1F3\U0001F1F1\U0001F1E9\U0001F1EA Двойной",out c,out n);Check(c=="NL"&&n=="\U0001F1E9\U0001F1EA Двойной","Only the first flag is taken.");

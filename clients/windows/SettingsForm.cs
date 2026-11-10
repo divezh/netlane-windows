@@ -102,17 +102,16 @@ namespace Netlane {
         readonly Panel subscriptionList = new Panel { Dock = DockStyle.Top, BackColor = Theme.Ground, Margin = new Padding(0) };
         const int SubscriptionRowHeight = 60;
         const int ServerRowHeight = 58;
-        // Top-docked stack: heading, hint, the rows, the import buttons.
+        // Top-docked stack: heading, the rows, the import buttons. What a link adds is told by the import dialog.
         Control BuildServersPage() {
             Panel page = new Panel { BackColor = Theme.Ground, AutoScroll = true };
             Label heading = Heading("Серверы"); heading.Dock = DockStyle.Top; heading.Height = 34;
-            Label hint = Hint("Ссылка подписки https://…/sub/… добавляет все локации своего сервера; подписок с разных серверов может быть несколько. Отдельный сервер — ссылка tt:// или файл TOML. Прежние серверы остаются."); hint.Dock = DockStyle.Top; hint.Height = 58;
             FlowLayoutPanel actions = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 62, WrapContents = false, BackColor = Theme.Ground, Padding = new Padding(0, 16, 0, 0) };
             Button paste = MainForm.Button("Добавить по ссылке…", true), toml = MainForm.Button("Открыть TOML…", false);
             paste.Dock = toml.Dock = DockStyle.None; paste.Size = new Size(210, 40); toml.Size = new Size(160, 40); paste.Margin = new Padding(0, 0, 10, 0); toml.Margin = new Padding(0);
             paste.Click += delegate { if (!host.PreviewOnly) host.ImportLink(); }; toml.Click += delegate { if (!host.PreviewOnly) host.ImportFile(); };
             actions.Controls.Add(paste); actions.Controls.Add(toml);
-            page.Controls.Add(actions); page.Controls.Add(serverList); page.Controls.Add(subscriptionList); page.Controls.Add(hint); page.Controls.Add(heading);
+            page.Controls.Add(actions); page.Controls.Add(serverList); page.Controls.Add(subscriptionList); page.Controls.Add(heading);
             return page;
         }
         internal void RebuildServers() {

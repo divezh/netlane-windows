@@ -33,7 +33,7 @@ namespace Netlane {
                     graphics.DrawArc(arch, size * .2f, size * .2f, size * .6f, size * .6f, 180, 180);
                     graphics.DrawLine(arch, size * .2f, size * .5f, size * .2f, size * .78f); graphics.DrawLine(arch, size * .8f, size * .5f, size * .8f, size * .78f);
                 }
-                using (Font font = AppFonts.CreatePixels(Math.Max(5f, size * .3f), true)) using (StringFormat center = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                using (Font font = new Font("Segoe UI", Math.Max(5f, size * .3f), FontStyle.Bold, GraphicsUnit.Pixel)) using (StringFormat center = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                     graphics.DrawString("W", font, Brushes.White, new RectangleF(0, size * .18f, size, size * .6f), center);
             }
             return bitmap;
@@ -283,7 +283,7 @@ namespace Netlane {
                 using (GraphicsPath path = Shapes.Round(clip, 1.5f * dpi)) graphics.DrawPath(pen, path);
             }
         }
-        // Drawn instead of the "⌄"/"›" characters: those fall back to fonts whose baseline and weight do not match the interface font.
+        // Drawn instead of the "⌄"/"›" characters: those fall back to fonts whose baseline and weight do not match Segoe UI.
         void DrawChevron(Graphics graphics, Color color, float dpi) {
             float size = 4.4f * dpi, x = Chevron == ChevronDirection.Left ? 15 * dpi : Width - 15 * dpi, y = Height / 2f;
             PointF[] points;
