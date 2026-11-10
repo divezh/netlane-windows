@@ -35,7 +35,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Fetch the patched engine from the pinned public release
         shell: pwsh
@@ -51,7 +51,7 @@ jobs:
       - name: Upload unsigned engine
         id: upload-engine
         if: env.SIGNPATH_ENABLED == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: netlane-engine-unsigned
           path: engine-unsigned/trusttunnel_client.exe
@@ -95,7 +95,7 @@ jobs:
       - name: Upload unsigned client
         id: upload-client
         if: env.SIGNPATH_ENABLED == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: netlane-client-unsigned
           # The artifact root must hold Netlane.exe, engine/ and licenses/ (.signpath/artifact-configurations/client.xml).
@@ -143,7 +143,7 @@ jobs:
           subject-path: dist/Netlane-windows-x64.zip
 
       - name: Upload archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: Netlane-windows-x64
           path: dist/*
