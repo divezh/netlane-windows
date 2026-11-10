@@ -22,7 +22,7 @@ namespace Netlane {
         // Account and feed line at the bottom of the navigation; a click refreshes the subscription.
         readonly SubscriptionRow subscriptionRow = new SubscriptionRow { Dock = DockStyle.Bottom, Height = 54, Margin = new Padding(0) };
         readonly StatusBlock statusBlock = new StatusBlock { Dock = DockStyle.Fill, Margin = new Padding(0), AlignLeft = true };
-        readonly SpeedGraph speedGraph = new SpeedGraph { Dock = DockStyle.Top, Height = 80, Margin = new Padding(0) };
+        readonly SpeedGraph speedGraph = new SpeedGraph { Dock = DockStyle.Top, Height = 78, Margin = new Padding(0) };
         readonly LocationsTable table = new LocationsTable { Dock = DockStyle.Fill, Margin = new Padding(0) };
         readonly TryCard tryCard = new TryCard { Dock = DockStyle.Top, Height = 104, Margin = new Padding(0) };
         readonly LogPreview logPreview = new LogPreview { Dock = DockStyle.Top, Height = 96, Margin = new Padding(0) };
@@ -37,15 +37,24 @@ namespace Netlane {
         readonly Label errorDetail = TextLabel("", Theme.BodySize, Theme.Muted), emptyTitle = TextLabel("", 20f, Theme.Ink), emptySub = TextLabel("", Theme.BodySize, Theme.Muted), emptyHint = TextLabel("Один сервер по ссылке tt:// тоже подойдёт", Theme.CaptionSize, Theme.Faint);
         readonly DarkButton transportButton = (DarkButton)Button("Сменить транспорт…", false), emptyPrimary = (DarkButton)Button("Вставить ссылку", true), emptySecondary = (DarkButton)Button("Открыть файл TOML…", false);
         readonly DarkButton setButton = (DarkButton)Button("", false);
-        // When every server was last pinged, under the table; the actions themselves live in the table.
-        readonly Label pingNote = TextLabel("", Theme.CaptionSize, Theme.Faint);
+        // How sites see this computer (PublicIp), and the network block shown while disconnected.
+        readonly Label ipValue = ValueLabel(), idleHint = TextLabel("", Theme.SmallSize, Theme.Faint), lastSession = TextLabel("", Theme.SmallSize, Theme.Muted);
+        Label sessionCaption;
+        Control[] liveOnly, idleOnly;
+        PublicIp publicIp;
+        bool ipThroughVpn, ipChecking, ipFailed;
+        int ipGeneration;
+        // «Авто»: the transport being tried for this start, whether the other one was tried already, and a watch.
+        string autoAttempt;
+        bool autoFellBack;
+        int autoGeneration;
         readonly Timer pingNoteTimer = new Timer { Interval = 30 * 1000 };
         DateTime lastPingCheck = DateTime.MinValue;
         readonly MiniSwitch killSwitch = new MiniSwitch { Anchor = AnchorStyles.Right, Margin = new Padding(0), AccessibleName = "Kill Switch" };
         bool refreshingKill;
         // The selected server's transport, the same setting as on «Серверы»; changing it while connected reconnects.
-        readonly SegmentedControl transportSwitch = new SegmentedControl { Items = new[] { "HTTP/2", "HTTP/3" }, Anchor = AnchorStyles.Left | AnchorStyles.Right, Height = 28, Margin = new Padding(0, 2, 0, 2), AccessibleName = "Транспорт" };
-        internal const string TransportHint = "HTTP/3 (QUIC, UDP) — ровнее для звонков и видео. HTTP/2 (TCP) — если сеть режет UDP. Во время работы VPN переключение переподключает его.";
+        readonly SegmentedControl transportSwitch = new SegmentedControl { Items = new[] { "Авто", "HTTP/2", "HTTP/3" }, Anchor = AnchorStyles.Left | AnchorStyles.Right, Height = 28, Margin = new Padding(0, 2, 0, 2), AccessibleName = "Транспорт" };
+        internal const string TransportHint = "Авто: сначала HTTP/3, а если сеть его не пропускает — HTTP/2; удачный запоминается. HTTP/3 (QUIC, UDP) ровнее для звонков и видео, HTTP/2 (TCP) — если сеть режет UDP. Во время работы VPN переключение переподключает его.";
         string currentPage = "home";
         SettingsForm settings;
         LogPage logPage;
@@ -179,26 +188,30 @@ namespace Netlane {
 
             // Left column: the locations table and two quiet actions under it.
             Panel locationsPane = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Ground, Margin = new Padding(0) };
-            Panel links = new Panel { Dock = DockStyle.Bottom, Height = 24, BackColor = Theme.Ground, Margin = new Padding(0), Padding = new Padding(12, 2, 0, 0) };
-            pingNote.Dock = DockStyle.Fill; links.Controls.Add(pingNote);
-            locationsPane.Controls.Add(table); locationsPane.Controls.Add(links);
+            locationsPane.Controls.Add(table);
 
             // Right column: the session, then the route and protection of the next connection.
             sessionPane = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Ground, Margin = new Padding(0) };
-            TableLayoutPanel graphFoot = new TableLayoutPanel { Dock = DockStyle.Top, Height = 18, ColumnCount = 2, RowCount = 1, Margin = new Padding(0), BackColor = Theme.Ground };
-            // The peak names both directions and needs most of the width.
-            graphFoot.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 74)); graphFoot.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            graphFoot.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            graphPeak.TextAlign = ContentAlignment.MiddleRight;
-            graphFoot.Controls.Add(TextLabel("60 секунд", Theme.CaptionSize, Theme.Faint), 0, 0); graphFoot.Controls.Add(graphPeak, 1, 0);
             setButton.Margin = new Padding(0, 3, 0, 3); setButton.Chevron = ChevronDirection.Down; setButton.TextAlign = ContentAlignment.MiddleLeft; setButton.Glyph = ButtonGlyph.None;
             setButton.AccessibleName = "Набор правил";
+            // DNS is a link to its settings: the only row here that is changed elsewhere.
+            dnsValue.Cursor = Cursors.Hand; dnsValue.ForeColor = Theme.Accent; dnsValue.AccessibleName = "DNS";
+            dnsValue.Click += delegate { OpenSettings("connection"); };
+            tips.SetToolTip(dnsValue, "Настроить DNS");
+            // Connected: the session with the public IP; disconnected: «Сеть» — the IP and the last session.
+            sessionCaption = SectionCaption("Сессия");
+            Control timeRow = Pair("Время", clock, 22, 150), downRow = Pair("Принято", received, 22, 150), upRow = Pair("Отправлено", sent, 22, 150), ipRow = Pair("Ваш IP", ipValue, 22, 200), graphGap = Spacer(4);
+            idleHint.Dock = DockStyle.Top; idleHint.Height = 20; lastSession.Dock = DockStyle.Top; lastSession.Height = 22;
+            ipValue.Cursor = Cursors.Hand; ipValue.AccessibleName = "Ваш IP";
+            ipValue.Click += delegate { if (!previewOnly) CheckIp(0); };
+            liveOnly = new[] { timeRow, downRow, upRow, graphGap, (Control)speedGraph };
+            idleOnly = new[] { (Control)idleHint, lastSession };
             Control[] session = {
-                SectionCaption("Сессия"), Spacer(4),
-                Pair("Время", clock, 22, 150), Pair("Принято", received, 22, 150), Pair("Отправлено", sent, 22, 150),
-                Spacer(6), speedGraph, graphFoot, Spacer(6),
+                sessionCaption, Spacer(4),
+                timeRow, downRow, upRow, ipRow, idleHint, lastSession,
+                graphGap, speedGraph, Spacer(6),
                 SectionCaption("Маршрут и защита"), Spacer(4),
-                Pair("Набор правил", setButton, 34, 160), Pair("Транспорт", transportSwitch, 32, 160), Pair("DNS", dnsValue, 28, 160), Pair("Kill Switch", killSwitch, 28, 60)
+                Pair("Набор правил", setButton, 34, 160), Pair("Транспорт", transportSwitch, 32, 184), Pair("DNS", dnsValue, 28, 160), Pair("Kill Switch", killSwitch, 28, 60)
             };
             for (int i = session.Length - 1; i >= 0; i--) sessionPane.Controls.Add(session[i]);
 
@@ -247,7 +260,7 @@ namespace Netlane {
 
             homePage.Controls.Add(normalView); homePage.Controls.Add(emptyHost); homePage.Controls.Add(topRow); homePage.Controls.Add(footer);
             pageHost.Controls.Add(homePage);
-            Shown += delegate { EngineLog.Write("startup: shown in " + startupClock.ElapsedMilliseconds + " ms"); };
+            Shown += delegate { EngineLog.Write("startup: shown in " + startupClock.ElapsedMilliseconds + " ms"); if (!previewOnly && publicIp == null && !ipChecking) CheckIp(0); };
             Controls.Add(pageHost); Controls.Add(side);
             connectButton.Click += async delegate { if (previewOnly) return; if (connection.Active) await Disconnect(); else await Connect(); };
             // The transport of a server is chosen in its row on «Серверы».
@@ -261,7 +274,7 @@ namespace Netlane {
             logPreview.CopyRequested += delegate { CopyEngineLog(); };
             table.Picked += delegate(string id) { if (!previewOnly) SwitchTo(id, null); };
             setButton.Click += delegate { OpenRoutingMenu(); };
-            transportSwitch.SelectedIndexChanged += delegate { if (!refreshingKill) SetTransport(transportSwitch.SelectedIndex == 1 ? "http3" : "http2"); };
+            transportSwitch.SelectedIndexChanged += delegate { if (!refreshingKill) SetTransport(TransportChoices[transportSwitch.SelectedIndex]); };
             killSwitch.CheckedChanged += delegate { if (refreshingKill) return; state.KillSwitch = killSwitch.Checked; state.NotifyChanged(); SaveState(); };
             emptyPrimary.Glyph = ButtonGlyph.Clipboard;
             emptySecondary.Glyph = ButtonGlyph.None;
@@ -429,12 +442,14 @@ namespace Netlane {
             setButton.Text = state.SelectedRuleSet.DisplayName;
             dnsValue.Text = selectedSubscription != null && selectedSubscription.ManagedDns != null ? "от администратора" : state.DnsServers != null && state.DnsServers.Count > 0 ? "личный" : "стандартный";
             refreshingKill = true;
-            try { killSwitch.Checked = state.KillSwitch; if (Selected != null) transportSwitch.SelectedIndex = Selected.Protocol == "http3" ? 1 : 0; } finally { refreshingKill = false; }
+            try { killSwitch.Checked = state.KillSwitch; if (Selected != null) transportSwitch.SelectedIndex = TransportIndex(Selected); } finally { refreshingKill = false; }
             tips.SetToolTip(transportSwitch, TransportHint);
             tips.SetToolTip(setButton, state.KillSwitch ? KillSwitchSwitchHint : "Набор правил маршрутизации. Переключение во время работы VPN переподключает его.");
             UpdateStatusText();
             ControlsEnabled();
             ShowView();
+            if (!previewOnly && !state.HidePublicIp && publicIp == null && !ipChecking && !ipFailed && IsHandleCreated) CheckIp(0);
+            WarnAccess();
             RefreshFooter();
         }
         // Views of «Подключение»: first launch instead of the columns, the error pane instead of the session.
@@ -445,6 +460,64 @@ namespace Netlane {
             emptyHost.Visible = empty;
             sessionPane.Visible = !error;
             errorPane.Visible = error;
+            bool live = Live;
+            foreach (Control c in liveOnly) c.Visible = live;
+            foreach (Control c in idleOnly) c.Visible = !live;
+            sessionCaption.Text = live ? "Сессия" : "Сеть";
+            RefreshNetwork();
+        }
+        // The engine runs (or is stopping): the session block; otherwise the «Сеть» block.
+        bool Live { get { return view == ConnectionView.Connected || view == ConnectionView.Reconnecting || view == ConnectionView.KillSwitch || view == ConnectionView.Disconnecting; } }
+
+        void RefreshNetwork() {
+            string tip;
+            if (state.HidePublicIp) { ipValue.Text = "не проверяется"; ipValue.ForeColor = Theme.Faint; tip = "Проверка внешнего IP выключена в «Настройках»."; }
+            else if (Live && view != ConnectionView.Connected) { ipValue.Text = Blank; ipValue.ForeColor = Theme.Ink; tip = ""; }
+            else if (Live && state.SelectedRuleSet.Routing.Mode != "general") { ipValue.Text = "зависит от сайта"; ipValue.ForeColor = Theme.Muted; tip = "Через VPN идут только адреса набора «" + state.SelectedRuleSet.DisplayName + "», остальные сайты видят ваш обычный IP."; }
+            else if (ipChecking || (publicIp != null && ipThroughVpn != (view == ConnectionView.Connected))) { ipValue.Text = "проверяю…"; ipValue.ForeColor = Theme.Faint; tip = ""; }
+            else if (publicIp == null) { ipValue.Text = ipFailed ? "не удалось проверить" : Blank; ipValue.ForeColor = Theme.Faint; tip = ipFailed ? "Щёлкните, чтобы проверить ещё раз." : ""; }
+            else { ipValue.Text = publicIp.Text; ipValue.ForeColor = Theme.Ink; tip = (ipThroughVpn ? "Так вас видят сайты: адрес VPN-сервера." : "Так вас видят сайты: VPN выключен.") + "\nПроверено через cloudflare.com. Щёлкните, чтобы проверить ещё раз."; }
+            tips.SetToolTip(ipValue, tip);
+            idleHint.Text = Selected == null ? "" : state.HidePublicIp ? "VPN выключен: трафик идёт напрямую." : "VPN выключен: сайты видят ваш обычный IP.";
+            if (state.LastSessionEnd == null) { lastSession.Text = ""; tips.SetToolTip(lastSession, ""); }
+            else {
+                lastSession.Text = "Последняя сессия: " + HumanDuration(state.LastSessionSeconds) + (state.LastSessionDown > 0 || state.LastSessionUp > 0 ? " · ↓ " + SessionStats.FormatBytes(state.LastSessionDown) + " · ↑ " + SessionStats.FormatBytes(state.LastSessionUp) : "");
+                DateTime end; string when = DateTime.TryParse(state.LastSessionEnd, null, System.Globalization.DateTimeStyles.RoundtripKind, out end) ? end.ToLocalTime().ToString("d MMMM, HH:mm", new System.Globalization.CultureInfo("ru-RU")) : "";
+                tips.SetToolTip(lastSession, (state.LastSessionServer ?? "") + (when.Length > 0 ? ", закончилась " + when : ""));
+            }
+        }
+        internal static string HumanDuration(long seconds) {
+            if (seconds < 60) return "меньше минуты";
+            long minutes = seconds / 60;
+            return minutes < 60 ? minutes + " мин" : (minutes / 60) + " ч " + (minutes % 60) + " мин";
+        }
+        // Asks Cloudflare which address and country this computer has now; a newer check cancels an older one.
+        async void CheckIp(int delayMs) {
+            if (previewOnly || state.HidePublicIp || IsDisposed) return;
+            int generation = ++ipGeneration;
+            ipChecking = true; ipFailed = false; RefreshNetwork();
+            if (delayMs > 0) await Task.Delay(delayMs);
+            if (generation != ipGeneration || IsDisposed) return;
+            bool throughVpn = view == ConnectionView.Connected;
+            try {
+                PublicIp result = await PublicIp.FetchAsync();
+                if (generation != ipGeneration || IsDisposed) return;
+                publicIp = result; ipThroughVpn = throughVpn;
+            } catch (Exception error) {
+                if (generation != ipGeneration || IsDisposed) return;
+                publicIp = null; ipFailed = true; EngineLog.Write("public ip: " + error.Message);
+            }
+            ipChecking = false; RefreshNetwork();
+        }
+        // Once a day per subscription: access ends within three days or the month's traffic is nearly used.
+        void WarnAccess() {
+            if (previewOnly || trayMenu == null) return;
+            string today = DateTime.Now.ToString("yyyy-MM-dd");
+            foreach (Subscription sub in state.Subscriptions) {
+                if (sub.WarnedOn == today || Account.LevelOf(sub, DateTime.UtcNow) != Account.Level.Warning) continue;
+                sub.WarnedOn = today; SaveState();
+                trayMenu.Notify(Program.ProductName, "Подписка «" + sub.DisplayName + "»: " + Account.Summary(sub, DateTime.UtcNow) + ". Продлите доступ у администратора.");
+            }
         }
         // «Вставить»: a tt:// link from the clipboard becomes a server; null on success, else what to say.
         internal string PasteLink(string text) {
@@ -620,12 +693,11 @@ namespace Netlane {
             } finally { checkingPings = false; if (!IsDisposed) table.Checking = false; }
         }
         void RefreshPingNote() {
-            if (lastPingCheck == DateTime.MinValue) { pingNote.Text = ""; return; }
+            if (lastPingCheck == DateTime.MinValue) { table.Note = null; return; }
             double age = (DateTime.UtcNow - lastPingCheck).TotalSeconds;
-            pingNote.Text = "Пинг проверен " + (age < 60 ? "только что" : age < 3600 ? ((int)(age / 60)) + " мин назад" : age < 86400 ? ((int)(age / 3600)) + " ч назад" : lastPingCheck.ToLocalTime().ToString("dd.MM HH:mm"));
+            table.Note = "Пинг проверен " + (age < 60 ? "только что" : age < 3600 ? ((int)(age / 60)) + " мин назад" : age < 86400 ? ((int)(age / 3600)) + " ч назад" : lastPingCheck.ToLocalTime().ToString("dd.MM HH:mm"));
         }
-        internal string PingNoteForTests { get { return pingNote.Text; } }
-        internal bool PeakFitsForTests { get { return graphPeak.Text.Length > 0 && TextRenderer.MeasureText(graphPeak.Text, graphPeak.Font).Width <= graphPeak.Width; } }
+        internal string PingNoteForTests { get { return table.Note; } }
         async Task ProbeLatency() {
             Server server = Selected;
             if (measuring || server == null || previewOnly) return;
@@ -726,12 +798,50 @@ namespace Netlane {
         }
         // Changes the server and/or rule set (null = keep). While the VPN runs it restarts the engine with the
         // new selection; calls made during a switch only record the latest target, which runs once afterwards.
-        // Saves the selected server's transport; a running VPN restarts on it, like a changed rule set.
-        internal void SetTransport(string protocol) {
+        // «Авто» · «HTTP/2» · «HTTP/3», the same on «Серверы».
+        internal static readonly string[] TransportChoices = { "auto", "http2", "http3" };
+        internal static int TransportIndex(Server server) { return server.AutoTransport ? 0 : server.EffectiveProtocol == "http3" ? 2 : 1; }
+        // Saves the selected server's transport choice; a running VPN restarts when the protocol changes.
+        internal void SetTransport(string choice) {
             Server server = Selected;
-            if (server == null || server.Protocol == protocol) return;
-            server.Protocol = protocol; state.NotifyChanged(); SaveState();
-            if (!previewOnly && connection.Active) { reapplyPending = true; reapplyLabel = protocol == "http3" ? "HTTP/3" : "HTTP/2"; SwitchTo(null, null); }
+            if (server == null || (server.Transport ?? server.Protocol) == choice && server.Transport != null) return;
+            string before = server.EffectiveProtocol;
+            server.Transport = choice; state.NotifyChanged(); SaveState();
+            if (!previewOnly && connection.Active && server.EffectiveProtocol != before) { reapplyPending = true; reapplyLabel = server.EffectiveProtocol == "http3" ? "HTTP/3" : "HTTP/2"; SwitchTo(null, null); }
+        }
+        // «Авто»: watches the start; HTTP/3 that does not connect in 15 s (or fails) gives way to HTTP/2, once.
+        void BeginAuto(bool fallback) {
+            if (!fallback) autoFellBack = false;
+            Server server = Selected;
+            autoAttempt = server != null && server.AutoTransport ? server.EffectiveProtocol : null;
+            int generation = ++autoGeneration;
+            if (autoAttempt != null && !autoFellBack) WatchAuto(generation);
+        }
+        async void WatchAuto(int generation) {
+            await Task.Delay(15000);
+            if (generation != autoGeneration || IsDisposed || autoAttempt == null) return;
+            if (view == ConnectionView.Connecting || view == ConnectionView.Reconnecting) StartFallback();
+        }
+        bool StartFallback() {
+            Server server = Selected;
+            if (autoAttempt == null || autoFellBack || server == null || !server.AutoTransport || previewOnly) return false;
+            string other = autoAttempt == "http3" ? "http2" : "http3";
+            autoFellBack = true; autoGeneration++;
+            server.AutoProtocol = other; SaveState();
+            EngineLog.Write("auto transport: " + autoAttempt + " did not connect, trying " + other);
+            FallBack(other);
+            return true;
+        }
+        async void FallBack(string protocol) {
+            ApplyView(ConnectionView.Connecting, null, (protocol == "http2" ? "HTTP/3 не подключился, пробую HTTP/2…" : "HTTP/2 не подключился, пробую HTTP/3…"));
+            if (connection.Active) {
+                busy = true; ControlsEnabled();
+                bool stopped;
+                try { stopped = await connection.StopAsync(); } finally { busy = false; ControlsEnabled(); }
+                if (!stopped) { Error("Движок ещё завершает работу. Повторите подключение через несколько секунд."); return; }
+            }
+            failed = false;
+            await Connect(true);
         }
         internal int TransportIndexForTests { get { return transportSwitch.SelectedIndex; } }
         internal Task SwitchTo(string serverId, string ruleSetId) {
@@ -772,6 +882,7 @@ namespace Netlane {
                         // Choices made while the engine stopped join this start: one restart per burst.
                         while (switchPending) { try { TakePending(); } catch (FormatException) { } }
                         SaveState();
+                        BeginAuto(false);
                         await connection.StartAsync(state.SessionProfile(), true, 0);
                     } catch (Exception error) { DropPending(); EngineLog.Write("switch failed: " + error); Error("Не удалось переключиться: " + error.Message); return; }
                     finally { busy = false; ControlsEnabled(); }
@@ -790,6 +901,7 @@ namespace Netlane {
             speed.Text = hasTraffic ? SessionStats.SpeedLine(downRate, upRate) : Blank;
             if (hasTraffic) speedGraph.Push(downRate, upRate);
             graphPeak.Text = PeakLine();
+            tips.SetToolTip(speedGraph, "Последние 60 секунд" + (graphPeak.Text.Length > 0 ? " · " + graphPeak.Text : ""));
             tips.SetToolTip(speed, hasTraffic ? "" : "Скорость недоступна: нет данных счётчика VPN.");
         }
         string PeakLine() { return speedGraph.Peak > 0 || speedGraph.UpPeak > 0 ? "пик ↓ " + SessionStats.FormatRate(speedGraph.Peak) + " · ↑ " + SessionStats.FormatRate(speedGraph.UpPeak) : ""; }
@@ -833,7 +945,7 @@ namespace Netlane {
             statusBlock.TitleColor = idle || view == ConnectionView.Connected ? Theme.Ink : style.Dot;
             statusBlock.DotColor = style.Dot; statusBlock.DotHalo = style.DotHalo;
             Server server = Selected;
-            string transport = server == null ? "" : server.Protocol == "http3" ? "HTTP/3 · UDP" : "HTTP/2 · TCP";
+            string transport = server == null ? "" : (server.EffectiveProtocol == "http3" ? "HTTP/3 · UDP" : "HTTP/2 · TCP") + (server.AutoTransport ? " · авто" : "");
             string ping; pings.TryGetValue(server == null ? "" : server.Id, out ping);
             string place = server == null ? "" : server.Name + " · " + transport;
             string subtitle;
@@ -885,6 +997,11 @@ namespace Netlane {
         // Preview and screenshot mode only (--state=...): shows a connection state without the engine.
         internal void ShowPreviewState(ConnectionView preview) {
             if (preview == ConnectionView.Connected || preview == ConnectionView.Reconnecting || preview == ConnectionView.KillSwitch) connectedAt = DateTime.UtcNow - new TimeSpan(0, 42, 17);
+            // A believable network block for screenshots: no request is made in preview.
+            bool vpn = preview == ConnectionView.Connected;
+            publicIp = vpn ? new PublicIp { Address = "185.12.40.7", Country = "RU" } : new PublicIp { Address = "37.45.110.21", Country = "BY" };
+            ipThroughVpn = vpn;
+            state.LastSessionEnd = DateTime.UtcNow.AddHours(-3).ToString("o"); state.LastSessionSeconds = 4325; state.LastSessionDown = 1932735283; state.LastSessionUp = 220200960; state.LastSessionServer = "Амстердам";
             switch (preview) {
                 case ConnectionView.NoProfile: state.Servers.Clear(); state.SelectedServerId = null; RefreshState(); ApplyView(preview, null, ""); break;
                 case ConnectionView.Connecting: ApplyView(preview, null, "Ожидаем подтверждения от VPN-сервера…"); break;
@@ -1014,8 +1131,9 @@ namespace Netlane {
                 else if (dialog.OpenTomlRequested) ImportFile();
             }
         }
-        internal async Task Connect() {
+        internal async Task Connect(bool fallback = false) {
             if (busy || Selected == null || connection.Active) return;
+            BeginAuto(fallback);
             Profile session;
             try { session = state.SessionProfile(); } catch (FormatException error) { Error(error.Message); return; }
             if (session.Routing.Applications.Count > 0 && !EngineSpec.SupportsApplications) { Error("Эта сборка не поддерживает правила приложений. Используйте полный комплект Netlane Connect."); return; }
@@ -1033,14 +1151,26 @@ namespace Netlane {
             if (IsDisposed || !IsHandleCreated) return;
             BeginInvoke((Action)delegate {
                 if (IsDisposed) return;
-                if (engineState == "CONNECTED") { failed = false; tunnelWarning = null; retrySeconds = 0; ApplyView(ConnectionView.Connected, null, ""); connectedAt = DateTime.UtcNow; traffic = new TrafficMeter(new AdapterTraffic()); traffic.Start(); UpdateSession(); timer.Start(); tray.Text = Program.ProductName + " · Подключено"; TrackTunnel(); if (announceSwitch && Selected != null) trayMenu.Notify(Program.ProductName, "Подключено: " + Selected.Name); announceSwitch = false; }
+                if (engineState == "CONNECTED") { if (autoAttempt != null && Selected != null && Selected.AutoTransport) { Selected.AutoProtocol = autoAttempt; SaveState(); } autoAttempt = null; autoGeneration++; CheckIp(2000); failed = false; tunnelWarning = null; retrySeconds = 0; ApplyView(ConnectionView.Connected, null, ""); connectedAt = DateTime.UtcNow; traffic = new TrafficMeter(new AdapterTraffic()); traffic.Start(); UpdateSession(); timer.Start(); tray.Text = Program.ProductName + " · Подключено"; TrackTunnel(); if (announceSwitch && Selected != null) trayMenu.Notify(Program.ProductName, "Подключено: " + Selected.Name); announceSwitch = false; }
                 else if (engineState.StartsWith("RECONNECTING")) { reconnectAttempts++; if (reconnectAttempts == 1) trayMenu.Notify(Program.ProductName, "Соединение потеряно, переподключаюсь"); int pause = 5; Int32.TryParse(engineState.IndexOf(':') >= 0 ? engineState.Substring(engineState.IndexOf(':') + 1) : "", out pause); retrySeconds = pause > 0 ? pause : 5; ApplyView(ConnectionView.Reconnecting, null, "Переподключение: попытка " + reconnectAttempts + " через " + retrySeconds + " с"); timer.Start(); tray.Text = Program.ProductName + " · Переподключение"; }
                 else if (engineState == "KILL_SWITCH_ACTIVE") { failed = true; timer.Stop(); ApplyView(ConnectionView.KillSwitch, null, "Нажмите «Отключиться», чтобы снять блокировку интернета."); tray.Text = Program.ProductName + " · Kill Switch"; trayMenu.Notify(Program.ProductName, "Интернет заблокирован: Kill Switch удерживает защиту"); }
+                else if ((engineState == "CONNECTION_ERROR" || engineState == "WORKER_ERROR") && StartFallback()) { }
                 else if (engineState == "CONNECTION_ERROR" || engineState == "WORKER_ERROR" || engineState == "ADMIN_REQUIRED") Error("Соединение не установлено. Проверьте доступ, срок, квоту и выбранный транспорт.");
                 else if (engineState == "STOP_FAILED") Error("VPN не подтвердил остановку. Дождитесь завершения, прежде чем выходить.");
-                else if (engineState == "STOPPED") { if (!switching) DropOrphans(); timer.Stop(); connectedAt = DateTime.MinValue; traffic = null; tunnelCheck++; tunnelWarning = null; retrySeconds = 0; reconnectAttempts = 0; if (!failed && !switching) ApplyView(Selected == null ? ConnectionView.NoProfile : ConnectionView.Idle, null, "VPN остановлен."); if (!switching) tray.Text = Program.ProductName + " · Не подключено"; }
+                else if (engineState == "STOPPED") { if (!switching) { DropOrphans(); RememberSession(); CheckIp(2000); } timer.Stop(); connectedAt = DateTime.MinValue; traffic = null; tunnelCheck++; tunnelWarning = null; retrySeconds = 0; reconnectAttempts = 0; if (!failed && !switching) ApplyView(Selected == null ? ConnectionView.NoProfile : ConnectionView.Idle, null, "VPN остановлен."); if (!switching) tray.Text = Program.ProductName + " · Не подключено"; }
                 ControlsEnabled();
             });
+        }
+        // The finished session for the «Сеть» block: how long, how much, where.
+        void RememberSession() {
+            if (connectedAt == DateTime.MinValue) return;
+            long down = 0, up = 0;
+            try { if (traffic != null) traffic.TryGet(out down, out up); } catch (Exception) { }
+            state.LastSessionEnd = DateTime.UtcNow.ToString("o");
+            state.LastSessionSeconds = (long)Math.Max(0, (DateTime.UtcNow - connectedAt).TotalSeconds);
+            state.LastSessionDown = down; state.LastSessionUp = up;
+            state.LastSessionServer = Selected == null ? null : Selected.Name;
+            SaveState();
         }
         void Error(string message) {
             announceSwitch = false; if (trayMenu != null) trayMenu.Notify(Program.ProductName + " · ошибка", message);

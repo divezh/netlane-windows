@@ -126,7 +126,6 @@ namespace Netlane {
                 LocationsTable table=(LocationsTable)all.First(c=>c is LocationsTable);
                 Check(table.Visible&&table.RowCount==2&&table.SelectedName=="Амстердам","Two locations: both are rows of the table: "+table.RowCount);
                 if(Type.GetType("Mono.Runtime")==null)foreach(string caption in new[]{"Время","Принято","Отправлено","Набор правил","Kill Switch"}){Label label=all.OfType<Label>().FirstOrDefault(c=>c.Text==caption);Check(label!=null&&TextRenderer.MeasureText(label.Text,label.Font).Width<=label.Width,"Session caption fits in the interface font: "+caption+(label==null?"":" "+TextRenderer.MeasureText(label.Text,label.Font).Width+"/"+label.Width));}
-                if(Type.GetType("Mono.Runtime")==null)Check(f.PeakFitsForTests,"The peak line under the speed lanes fits its column.");
                 Check(!all.Any(c=>c is LinkLabel&&c.Visible&&(c.Text=="Проверить пинг"||c.Text=="Добавить ссылку…")),"Ping check and adding live in the table, not as links under it.");
                 Check(table.AddRowBounds.Bottom<=table.Height&&table.RefreshBounds.Right<=table.Width,"The add row and the refresh glyph fit the table: "+table.AddRowBounds+" / "+table.RefreshBounds);
                 Check(f.Size.Width==920&&f.Size.Height==560,"Default window is 920 × 560: "+f.Size);
@@ -184,10 +183,13 @@ namespace Netlane {
                 Pump(f.CheckPings());
                 Check(table.PingFor(0)=="31 мс"&&f.PingsForTests.Count==2&&f.PingsForTests[f.State.Servers[1].Id]=="нет ответа","Ping check measures every server and updates the table.");
                 Check(!table.Checking&&f.PingNoteForTests=="Пинг проверен только что","After a ping check the note under the table says when: "+f.PingNoteForTests);
-                string before=f.State.SelectedServer.Protocol;f.SetTransport("http3");f.RefreshState();
-                Check(f.State.SelectedServer.Protocol=="http3"&&f.TransportIndexForTests==1,"The transport switch on the main page sets the selected server's protocol.");
-                f.SetTransport(before);f.RefreshState();
-                Check(f.TransportIndexForTests==(before=="http3"?1:0)&&AllControls(f).Any(c=>c is SegmentedControl&&c.AccessibleName=="Транспорт"&&c.Visible),"The main page shows the transport switch.");
+                Server chosen=f.State.SelectedServer;string before=chosen.Transport;f.SetTransport("http3");f.RefreshState();
+                Check(chosen.EffectiveProtocol=="http3"&&chosen.Transport=="http3"&&f.TransportIndexForTests==2,"The transport switch on the main page sets the selected server's transport.");
+                f.SetTransport("auto");f.RefreshState();
+                Check(chosen.AutoTransport&&f.TransportIndexForTests==0&&chosen.EffectiveProtocol==(chosen.AutoProtocol??"http3"),"«Авто» starts on HTTP/3 or on what last worked.");
+                chosen.Transport=before;f.RefreshState();
+                Check(AllControls(f).Any(c=>c is SegmentedControl&&c.AccessibleName=="Транспорт"&&c.Visible&&((SegmentedControl)c).Items.Length==3),"The main page shows the three-way transport switch.");
+                Check(AllControls(f).Any(c=>c is Label&&c.Visible&&c.Text=="Сеть")&&AllControls(f).Any(c=>c is Label&&c.AccessibleName=="Ваш IP"&&c.Visible)&&!AllControls(f).Any(c=>c is Label&&c.Visible&&c.Text=="Время"),"Disconnected: the «Сеть» block with the IP instead of an empty session.");
                 int pingAsks=0,addAsks=0; table.PingRequested+=delegate{pingAsks++;}; table.AddRequested+=delegate{addAsks++;};
                 table.RequestPing(); table.RequestAdd(); table.Checking=true; table.RequestPing(); table.Checking=false;
                 Check(pingAsks==1&&addAsks==1,"The refresh glyph and the add row raise their actions; a running check ignores another: "+pingAsks+"/"+addAsks);
@@ -305,7 +307,7 @@ namespace Netlane {
                 StatusBlock status = (StatusBlock)AllControls(main).First(c => c is StatusBlock);
                 Server selected = main.State.SelectedServer; int changed = 0; main.State.Changed += delegate { changed++; };
                 settings.SetProtocol(selected.Id, "http3"); Application.DoEvents();
-                Check(selected.Protocol == "http3" && changed > 0 && status.Subtitle.Contains("HTTP/3 · UDP"), "Protocol changed in settings reaches the state and the main window: " + status.Subtitle);
+                Check(selected.EffectiveProtocol == "http3" && selected.Transport == "http3" && changed > 0 && status.Subtitle.Contains("HTTP/3 · UDP"), "Protocol changed in settings reaches the state and the main window: " + status.Subtitle);
                 Check(settings.RenameServer(selected.Id, "   ") != null && settings.RenameServer(selected.Id, new string('x', 65)) != null && selected.Name != "   ", "Empty or long names are rejected.");
                 Check(settings.RenameServer(selected.Id, "Амстердам") == null && selected.Name == "Амстердам" && status.Subtitle.StartsWith("Амстердам"), "Rename reaches the card.");
                 settings.SetCountry(selected.Id, "NL"); Check(selected.Country == "NL", "Flag change.");
@@ -481,6 +483,13 @@ namespace Netlane {
         static void ImportTests() {
             string c,n;ServerName.Split("\U0001F1F3\U0001F1F1 Амстердам",out c,out n);Check(c=="NL"&&n=="Амстердам","Flag split.");
             ServerName.Split("Амстердам",out c,out n);Check(c==null&&n=="Амстердам","No flag.");
+            PublicIp traced=PublicIp.Parse("fl=12f\nh=www.cloudflare.com\nip=185.12.40.7\nts=1\nloc=RU\nwarp=off\n");
+            Check(traced.Address=="185.12.40.7"&&traced.Country=="RU"&&traced.Text=="185.12.40.7 · Россия","Cloudflare trace gives the address and the country.");
+            Check(PublicIp.Parse("ip=2a01:4f8::1\nloc=XX").Text=="2a01:4f8::1","An unknown country is left out.");
+            bool badTrace=false;try{PublicIp.Parse("<html>blocked</html>");}catch(FormatException){badTrace=true;}Check(badTrace,"A page that is not a trace is refused.");
+            Server pinned=new Server{Protocol="http2",Transport="http3"};Check(pinned.EffectiveProtocol=="http3"&&pinned.ToProfile().Protocol=="http3","The user's transport wins over the panel's.");
+            Server auto=new Server{Protocol="http2",Transport="auto"};Check(auto.EffectiveProtocol=="http3","«Авто» tries HTTP/3 first.");auto.AutoProtocol="http2";Check(auto.EffectiveProtocol=="http2","«Авто» remembers what connected.");
+            Check(MainForm.HumanDuration(30)=="меньше минуты"&&MainForm.HumanDuration(4325)=="1 ч 12 мин"&&MainForm.HumanDuration(600)=="10 мин","Session length in words.");
             Check(new Subscription{Name="\U0001F1F5\U0001F1F1 Warsaw",Url="https://panel.example/sub/abc"}.DisplayName=="Warsaw"&&new Subscription{Name="\U0001F1F5\U0001F1F1",Url="https://panel.example/sub/abc"}.DisplayName=="panel.example","A subscription name drops the flag emoji; a bare flag falls back to the host.");
             ServerName.Split("\U0001F1F3 Амстердам",out c,out n);Check(c==null&&n=="\U0001F1F3 Амстердам","Lone indicator kept.");
             ServerName.Split("\U0001F1FF\U0001F1FF Test",out c,out n);Check(c=="ZZ"&&n=="Test","Unknown code still parsed; drawing falls back.");

@@ -42,6 +42,9 @@ namespace Netlane {
         internal void PickRow(int row) { if (row < 0 || row >= servers.Count || !Enabled) return; Action<string> handler = Picked; if (handler != null) handler(servers[row].Id); }
         // The refresh glyph turns while every server is being pinged and ignores clicks then.
         internal bool Checking { get { return checking; } set { if (checking == value) return; checking = value; if (value) spin.Start(); else { spin.Stop(); spinAngle = 0; } Invalidate(); } }
+        string note;
+        // «Пинг проверен 2 мин назад»: drawn under the add row.
+        internal string Note { get { return note; } set { if (note == value) return; note = value; Invalidate(); } }
         internal bool PingEnabled { get { return pingEnabled; } set { if (pingEnabled == value) return; pingEnabled = value; Invalidate(); } }
         internal void RequestPing() { if (!Enabled || !pingEnabled || checking) return; Action handler = PingRequested; if (handler != null) handler(); }
         internal void RequestAdd() { if (!Enabled) return; Action handler = AddRequested; if (handler != null) handler(); }
@@ -52,7 +55,7 @@ namespace Netlane {
         int Total { get { return servers.Count + 1; } }
         int HeaderHeight { get { return (int)(28 * scale); } }
         int RowHeight { get { return (int)(36 * scale); } }
-        int VisibleRows { get { return Math.Max(1, (Height - HeaderHeight - (int)(4 * scale)) / Math.Max(1, RowHeight)); } }
+        int VisibleRows { get { return Math.Max(1, (Height - HeaderHeight - (int)(28 * scale)) / Math.Max(1, RowHeight)); } }
         void ClampScroll() { first = Math.Max(0, Math.Min(first, Total - VisibleRows)); }
         internal Rectangle RowBounds(int row) { return new Rectangle(0, HeaderHeight + (int)(4 * scale) + (row - first) * RowHeight, Width, RowHeight - (int)(2 * scale)); }
         int RowAt(Point point) {
@@ -129,9 +132,14 @@ namespace Netlane {
                     int textLeft = box.X + pad + flagWidth + (int)(12 * scale);
                     Color ink = !Enabled ? Theme.Faint : selected ? Theme.Ink : Theme.Muted;
                     TextRenderer.DrawText(g, server.Name ?? server.Hostname, selected ? bold : body, new Rectangle(textLeft, box.Y, Math.Max(0, Width - pad - pingWidth - transportWidth - textLeft - (int)(8 * scale)), box.Height), selected ? (Enabled ? Theme.Ink : Theme.Faint) : ink, flags | TextFormatFlags.Left);
-                    TextRenderer.DrawText(g, server.Protocol == "http3" ? "HTTP/3" : "HTTP/2", small, new Rectangle(Width - pad - pingWidth - transportWidth, box.Y, transportWidth, box.Height), Theme.Faint, flags | TextFormatFlags.Left);
+                    TextRenderer.DrawText(g, server.EffectiveProtocol == "http3" ? "HTTP/3" : "HTTP/2", small, new Rectangle(Width - pad - pingWidth - transportWidth, box.Y, transportWidth, box.Height), Theme.Faint, flags | TextFormatFlags.Left);
                     string ping; pings.TryGetValue(server.Id, out ping);
                     TextRenderer.DrawText(g, String.IsNullOrEmpty(ping) ? "—" : ping, body, new Rectangle(Width - pad - pingWidth, box.Y, pingWidth, box.Height), ping == "нет ответа" ? Theme.Warning : ink, flags | TextFormatFlags.Right);
+                }
+                // When pings were last checked, right under the add row when it is in view.
+                if (!String.IsNullOrEmpty(Note) && Total <= first + VisibleRows) {
+                    Rectangle add = RowBounds(servers.Count);
+                    TextRenderer.DrawText(g, Note, caption, new Rectangle(pad, add.Bottom + (int)(6 * scale), Width - 2 * pad, (int)(18 * scale)), Theme.Faint, flags | TextFormatFlags.Left);
                 }
                 // A thin rail on the right edge says there is more than fits.
                 if (Total > VisibleRows) {

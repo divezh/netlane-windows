@@ -32,6 +32,8 @@ namespace Netlane {
         public long QuotaBytes { get; set; }
         public long QuotaUsedBytes { get; set; }
         public string QuotaMonth { get; set; }
+        // The local date (yyyy-MM-dd) a «доступ скоро закончится» notice was last shown; one a day.
+        public string WarnedOn { get; set; }
         internal int PendingRefreshes { get; set; }
         public Subscription() { Id = Guid.NewGuid().ToString("N"); UpdateHours = DefaultHours; }
 

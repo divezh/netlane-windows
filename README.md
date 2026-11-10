@@ -74,6 +74,7 @@ Netlane не устанавливается в систему — это пап�
 Netlane не собирает и не отправляет телеметрию. Программа подключается только:
 
 - к серверам и ссылкам подписки, которые добавил пользователь (подключение VPN, обновление подписки, проверка пинга);
+- к Cloudflare (`www.cloudflare.com/cdn-cgi/trace`) — чтобы показать на главной ваш внешний IP и страну: при запуске, после подключения и отключения. Передаётся обычный HTTPS-запрос; проверку можно выключить в «Настройках» → «Показывать внешний IP». Cloudflare обрабатывает запрос по своей [политике конфиденциальности](https://www.cloudflare.com/privacypolicy/);
 - к GitHub (`raw.githubusercontent.com`, `api.github.com`, `github.com`) — проверка обновлений при запуске и по кнопке, скачивание архива обновления. Передаётся обычный HTTPS-запрос с заголовком `User-Agent: Netlane/<версия>`; GitHub обрабатывает его по своей [политике конфиденциальности](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement).
 
 Профили, пароли и ссылки подписки хранятся только на этом компьютере, зашифрованные Windows DPAPI.
@@ -89,7 +90,7 @@ Team roles:
 - Committers and reviewers: [divezh](https://github.com/divezh)
 - Approvers: [divezh](https://github.com/divezh)
 
-Privacy policy: see [«Конфиденциальность»](#конфиденциальность). In short: this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it, except the update check against GitHub described above.
+Privacy policy: see [«Конфиденциальность»](#конфиденциальность). In short: this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it, except the update check against GitHub and the public IP check against Cloudflare described above (the latter can be turned off).
 
 ## Безопасность и ограничения
 

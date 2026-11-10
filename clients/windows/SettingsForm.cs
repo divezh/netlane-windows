@@ -187,7 +187,7 @@ namespace Netlane {
             RowPanel row = new RowPanel { Dock = DockStyle.Fill, Margin = new Padding(0), TopLine = first };
             TableLayoutPanel cells = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1, BackColor = Theme.Ground, Margin = new Padding(0), Padding = new Padding(4, 0, 0, 0) };
             foreach (float w in new float[] { 30, 40 }) cells.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, w));
-            cells.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); cells.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170)); cells.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 40));
+            cells.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); cells.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 204)); cells.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 40));
             cells.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             RadioDot radio = new RadioDot { Checked = server.Id == state.SelectedServerId, Anchor = AnchorStyles.None, Size = new Size(20, 20), Margin = new Padding(0) };
             radio.Click += delegate { if (!host.PreviewOnly) host.SwitchTo(server.Id, null); else { state.SelectServer(server.Id); } };
@@ -200,10 +200,11 @@ namespace Netlane {
             text.RowStyles.Add(new RowStyle(SizeType.Percent, 52)); text.RowStyles.Add(new RowStyle(SizeType.Percent, 48));
             text.Controls.Add(name, 0, 0); text.Controls.Add(sub, 0, 1);
             tips.SetToolTip(name, server.Hostname); tips.SetToolTip(sub, server.Address);
-            SegmentedControl transport = new SegmentedControl { Items = new[] { "HTTP/2", "HTTP/3" }, SelectedIndex = server.Protocol == "http3" ? 1 : 0, Anchor = AnchorStyles.Left | AnchorStyles.Right, Height = 32, Margin = new Padding(0, 0, 8, 0) };
+            SegmentedControl transport = new SegmentedControl { Items = new[] { "Авто", "HTTP/2", "HTTP/3" }, SelectedIndex = MainForm.TransportIndex(server), Anchor = AnchorStyles.Left | AnchorStyles.Right, Height = 32, Margin = new Padding(0, 0, 8, 0) };
             transport.Enabled = !(host.VpnActive && server.Id == state.SelectedServerId);
             if (!transport.Enabled) tips.SetToolTip(transport, "Отключите VPN, чтобы сменить транспорт выбранного сервера.");
-            transport.SelectedIndexChanged += delegate { SetProtocol(server.Id, transport.SelectedIndex == 1 ? "http3" : "http2"); };
+            transport.SelectedIndexChanged += delegate { SetProtocol(server.Id, MainForm.TransportChoices[transport.SelectedIndex]); };
+            tips.SetToolTip(transport, MainForm.TransportHint);
             IconButton more = new IconButton { Glyph = IconGlyph.More, Anchor = AnchorStyles.None, Size = new Size(32, 32), Margin = new Padding(0) };
             tips.SetToolTip(more, "Переименовать, сменить флаг, проверить пинг, удалить");
             more.Click += delegate { ServerMenuFor(server).Show(more, new Point(0, more.Height)); };
@@ -225,10 +226,11 @@ namespace Netlane {
             return menu;
         }
 
-        internal void SetProtocol(string id, string protocol) {
+        // The user's transport choice ("auto", "http2", "http3"); kept when the subscription refreshes.
+        internal void SetProtocol(string id, string choice) {
             Server server = state.Servers.First(s => s.Id == id);
-            if (server.Protocol == protocol) return;
-            server.Protocol = protocol; state.NotifyChanged(); host.SaveState();
+            if (server.Transport == choice) return;
+            server.Transport = choice; state.NotifyChanged(); host.SaveState();
         }
         // Null on success, otherwise the reason (shown to the user).
         internal string RenameServer(string id, string name) {

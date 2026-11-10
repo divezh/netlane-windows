@@ -20,6 +20,8 @@ namespace Netlane {
             stack.Add(Toggle("Anti-DPI", "Дополнительные меры против распознавания VPN. Включайте при обрывах и блокировках.", s => s.AntiDpi, (s, v) => s.AntiDpi = v));
             Label applies = Hint("Kill Switch и Anti-DPI применяются при следующем подключении."); applies.Height = 26; stack.Add(applies);
             stack.Add(Group("DNS ДЛЯ VPN")); stack.Add(BuildDnsSettings());
+            stack.Add(Group("КОНФИДЕНЦИАЛЬНОСТЬ"));
+            stack.Add(Toggle("Показывать внешний IP", "Узнавать ваш адрес и страну через cloudflare.com, чтобы показать на главной, как вас видят сайты.", s => !s.HidePublicIp, (s, v) => s.HidePublicIp = !v));
             stack.Add(Group("ЗАПУСК"));
             stack.Add(Toggle("Запускать вместе с Windows", "Программа стартует свёрнутой в трей после входа в Windows.", s => s.StartWithWindows, (s, v) => s.StartWithWindows = v));
             stack.Add(Toggle("Подключаться к последнему серверу при запуске", "Сразу включить VPN с выбранным сервером и набором правил.", s => s.AutoConnect, (s, v) => s.AutoConnect = v));

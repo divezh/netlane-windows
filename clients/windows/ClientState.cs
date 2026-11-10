@@ -15,7 +15,15 @@ namespace Netlane {
         public string Address { get; set; }
         public string Username { get; set; }
         public string Password { get; set; }
+        // The transport the panel or the profile gives; a subscription refresh overwrites it.
         public string Protocol { get; set; }
+        // The user's choice, kept across refreshes: null (follow Protocol), "auto", "http2" or "http3".
+        public string Transport { get; set; }
+        // In "auto": the transport that last connected (null → HTTP/3 first).
+        public string AutoProtocol { get; set; }
+        [ScriptIgnore] public bool AutoTransport { get { return Transport == "auto"; } }
+        // What the engine is started with.
+        [ScriptIgnore] public string EffectiveProtocol { get { return Transport == "auto" ? (AutoProtocol ?? "http3") : Transport ?? Protocol; } }
         // Servers from a subscription: its Id and the node id in its feed; null when added by hand.
         public string SubscriptionId { get; set; }
         public string RemoteId { get; set; }
@@ -27,6 +35,8 @@ namespace Netlane {
             if (String.IsNullOrEmpty(Id) || !Regex.IsMatch(Id, @"\A[0-9a-f]{32}\z")) throw new FormatException("Повреждённый идентификатор сервера.");
             ValidateName(Name);
             if (Country != null && !Regex.IsMatch(Country, @"\A[A-Z]{2}\z")) throw new FormatException("Страна сервера — две латинские буквы.");
+            if (Transport != null && Transport != "auto" && Transport != "http2" && Transport != "http3") Transport = null;
+            if (AutoProtocol != null && AutoProtocol != "http2" && AutoProtocol != "http3") AutoProtocol = null;
             if (RemoteId != null && !Regex.IsMatch(RemoteId, @"\A[A-Za-z0-9_-]{1,64}\z")) throw new FormatException("Повреждённый идентификатор сервера подписки.");
             ToProfile().Validate();
         }
@@ -34,7 +44,7 @@ namespace Netlane {
             if (String.IsNullOrEmpty(name) || name.Trim().Length == 0 || name.Length > 64 || name.Any(Char.IsControl)) throw new FormatException("Название сервера — от 1 до 64 символов.");
         }
         internal Profile ToProfile() {
-            return new Profile { Hostname = Hostname, Address = Address, Username = Username, Password = Password, Protocol = Protocol, Name = Name };
+            return new Profile { Hostname = Hostname, Address = Address, Username = Username, Password = Password, Protocol = EffectiveProtocol, Name = Name };
         }
         public static Server FromProfile(Profile profile) {
             Server server = new Server { Hostname = profile.Hostname, Address = profile.Address, Username = profile.Username, Password = profile.Password, Protocol = profile.Protocol, Name = DefaultName(profile.Hostname) };
@@ -83,6 +93,14 @@ namespace Netlane {
         public bool StartWithWindows { get; set; }
         public bool AutoConnect { get; set; }
         public bool CloseToTray { get; set; }
+        // Off by default: the public IP is checked through cloudflare.com/cdn-cgi/trace unless the user turns it off.
+        public bool HidePublicIp { get; set; }
+        // The last finished session, shown while disconnected.
+        public string LastSessionEnd { get; set; }
+        public long LastSessionSeconds { get; set; }
+        public long LastSessionDown { get; set; }
+        public long LastSessionUp { get; set; }
+        public string LastSessionServer { get; set; }
         // The version the user chose to postpone; the startup dialog stays quiet until the next one.
         public string SkippedUpdateVersion { get; set; }
         public event Action Changed;
