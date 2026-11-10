@@ -45,7 +45,7 @@ namespace Netlane {
         }
         ContextMenuStrip SetMenu() {
             RuleSet set = Find(editingId);
-            ContextMenuStrip menu = new ContextMenuStrip { BackColor = Theme.Card, ForeColor = Theme.Ink, ShowImageMargin = false, Renderer = new DarkMenuRenderer() };
+            ContextMenuStrip menu = DarkMenuRenderer.CreateMenu(180); menu.ShowCheckMargin = false;
             ToolStripItem rename = menu.Items.Add("Переименовать…", null, delegate {
                 string name = InputDialog.Ask(this, "Название набора", "Новое название набора правил:", set.Name);
                 if (name == null) return;

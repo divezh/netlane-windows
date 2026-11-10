@@ -213,7 +213,7 @@ namespace Netlane {
             return row;
         }
         ContextMenuStrip ServerMenuFor(Server server) {
-            ContextMenuStrip menu = new ContextMenuStrip { BackColor = Theme.Card, ForeColor = Theme.Ink, ShowImageMargin = false, Renderer = new DarkMenuRenderer() };
+            ContextMenuStrip menu = DarkMenuRenderer.CreateMenu(180); menu.ShowCheckMargin = false;
             // Names and flags of subscription servers come from the main server.
             if (server.SubscriptionId == null) menu.Items.Add("Переименовать…", null, delegate { string name = InputDialog.Ask(this, "Название сервера", "Новое название (до 64 символов):", server.Name); if (name != null) { string error = RenameServer(server.Id, name); if (error != null) MessageBox.Show(this, error, "Название сервера", MessageBoxButtons.OK, MessageBoxIcon.Warning); } });
             if (server.SubscriptionId == null) menu.Items.Add("Сменить флаг…", null, delegate { string code; if (CountryPicker.Pick(this, server.Country, out code)) SetCountry(server.Id, code); });

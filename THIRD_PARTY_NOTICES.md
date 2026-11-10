@@ -23,6 +23,16 @@ Prebuilt Binaries License; полный текст: `licenses/WINTUN_LICENSE.txt
 
 - https://www.wintun.net/
 
+## Inter
+
+Шрифт интерфейса — Inter, Copyright (c) 2016 The Inter Project Authors, лицензия
+SIL Open Font License 1.1. В приложение встроены начертания Regular и SemiBold,
+сокращённые до латиницы, кириллицы и нужных знаков и прохинтованные ttfautohint
+(`clients/windows/fonts`).
+
+- https://github.com/rsms/inter
+- Полный текст: `licenses/INTER_LICENSE.txt` в собранном архиве.
+
 ## Twemoji
 
 Флаги стран в интерфейсе — графика Twemoji, Copyright 2020 Twitter, Inc and other

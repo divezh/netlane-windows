@@ -170,6 +170,7 @@ namespace Netlane {
                 Check(action.Kind==ButtonKind.Primary,"Idle: the action is the primary «Подключиться».");
                 Check(all.OfType<StatusBlock>().Any(c=>c.Visible&&c.Title=="Не подключено"),"Idle status.");
                 Check(!all.Any(c=>c is Label&&c.Visible&&(c.Text.StartsWith("↓ ")||c.Text.StartsWith("↑ "))),"Idle: no traffic in the session rows.");
+                if(Type.GetType("Mono.Runtime")==null){using(Font body=Theme.Font(10f))using(Font strong=Theme.Font(10f,true))Check(AppFonts.Embedded&&body.Name=="Inter"&&strong.Name=="Inter SemiBold","The interface font is the embedded Inter: "+body.Name+" / "+strong.Name);}
                 SpeedGraph lanes=new SpeedGraph(); lanes.Push(2048,100); lanes.Push(4096,300);
                 Check(lanes.SampleCount==2&&lanes.Peak==4096&&lanes.UpPeak==300&&lanes.Last(true)==300&&lanes.Last(false)==4096,"Speed lanes keep receive and send apart.");
                 lanes.Dispose();

@@ -368,7 +368,7 @@ namespace Netlane {
             return demo;
         }
 
-        internal static Label TextLabel(string text, float size, Color color) { return new Label { Text = text, Font = new Font("Segoe UI", size), ForeColor = color, Dock = DockStyle.Fill, Margin = new Padding(0), AutoSize = false, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft }; }
+        internal static Label TextLabel(string text, float size, Color color) { return new Label { Text = text, Font = Theme.Font(size), ForeColor = color, Dock = DockStyle.Fill, Margin = new Padding(0), AutoSize = false, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft }; }
         // Right-aligned value of a «caption … value» row.
         static Label ValueLabel() { Label label = TextLabel("", Theme.BodySize, Theme.Ink); label.TextAlign = ContentAlignment.MiddleRight; return label; }
         static LinkLabel ActionLink(string text) {

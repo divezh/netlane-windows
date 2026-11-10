@@ -46,7 +46,8 @@ namespace Netlane {
         internal static Color Fade(Color color, int alpha) { return Color.FromArgb(alpha, color.R, color.G, color.B); }
         internal static Color Darken(Color color, int amount) { return Color.FromArgb(color.A, Math.Max(0, color.R - amount), Math.Max(0, color.G - amount), Math.Max(0, color.B - amount)); }
 
-        internal static Font Font(float size, bool semibold = false) { return new Font(semibold ? "Segoe UI Semibold" : "Segoe UI", size); }
+        // Inter from AppFonts, Segoe UI if it could not be loaded.
+        internal static Font Font(float size, bool semibold = false) { return AppFonts.Create(size, semibold); }
         internal static Font Mono(float size) { return new Font("Consolas", size); }
 
         // Spec table "Состояния подключения": dot, ring and whether the ring can be pressed.

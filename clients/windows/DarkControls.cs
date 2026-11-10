@@ -33,7 +33,7 @@ namespace Netlane {
                     graphics.DrawArc(arch, size * .2f, size * .2f, size * .6f, size * .6f, 180, 180);
                     graphics.DrawLine(arch, size * .2f, size * .5f, size * .2f, size * .78f); graphics.DrawLine(arch, size * .8f, size * .5f, size * .8f, size * .78f);
                 }
-                using (Font font = new Font("Segoe UI", Math.Max(5f, size * .3f), FontStyle.Bold, GraphicsUnit.Pixel)) using (StringFormat center = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                using (Font font = AppFonts.CreatePixels(Math.Max(5f, size * .3f), true)) using (StringFormat center = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                     graphics.DrawString("W", font, Brushes.White, new RectangleF(0, size * .18f, size, size * .6f), center);
             }
             return bitmap;
@@ -283,7 +283,7 @@ namespace Netlane {
                 using (GraphicsPath path = Shapes.Round(clip, 1.5f * dpi)) graphics.DrawPath(pen, path);
             }
         }
-        // Drawn instead of the "⌄"/"›" characters: those fall back to fonts whose baseline and weight do not match Segoe UI.
+        // Drawn instead of the "⌄"/"›" characters: those fall back to fonts whose baseline and weight do not match the interface font.
         void DrawChevron(Graphics graphics, Color color, float dpi) {
             float size = 4.4f * dpi, x = Chevron == ChevronDirection.Left ? 15 * dpi : Width - 15 * dpi, y = Height / 2f;
             PointF[] points;
@@ -366,9 +366,10 @@ namespace Netlane {
             using (GraphicsPath path = Shapes.Round(row, 6 * scale)) using (Brush fill = new SolidBrush(color)) g.FillPath(fill, path);
             g.Restore(saved);
         }
+        // The tick sits on the row's vertical centre, whatever rectangle WinForms reserved for it.
         protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs args) {
             Rectangle box = args.ImageRectangle;
-            float scale = args.Graphics.DpiX / 96f, x = box.Left + box.Width / 2f + scale, y = box.Top + box.Height / 2f;
+            float scale = args.Graphics.DpiX / 96f, x = box.Left + box.Width / 2f + scale, y = args.Item.Height / 2f;
             GraphicsState saved = args.Graphics.Save(); args.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using (Pen tick = new Pen(args.Item.Enabled ? Theme.Accent : Theme.Muted, 1.8f * scale) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
                 args.Graphics.DrawLines(tick, new[] { new PointF(x - 4 * scale, y), new PointF(x - scale, y + 3 * scale), new PointF(x + 5 * scale, y - 4 * scale) });
@@ -380,10 +381,13 @@ namespace Netlane {
             using (Pen line = new Pen(Theme.Line)) args.Graphics.DrawLine(line, (int)(10 * scale), args.Item.Height / 2, args.Item.Width - (int)(11 * scale), args.Item.Height / 2);
         }
         // An item may ask for a quieter colour (actions under a separator); disabled items always fade.
+        // The text is drawn here, centred on the whole row height: the base renderer's text rectangle
+        // follows the item's padding and font metrics and sits a pixel or two off the highlight.
         protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs args) {
             ToolStripMenuItem menuItem = args.Item as ToolStripMenuItem;
-            args.TextColor = !args.Item.Enabled ? Theme.Faint : args.Item.Selected || (menuItem != null && menuItem.Checked) ? Theme.Ink : args.Item.ForeColor;
-            base.OnRenderItemText(args);
+            Color color = !args.Item.Enabled ? Theme.Faint : args.Item.Selected || (menuItem != null && menuItem.Checked) ? Theme.Ink : args.Item.ForeColor;
+            Rectangle text = new Rectangle(args.TextRectangle.X, 0, Math.Max(0, args.Item.Width - args.TextRectangle.X - 4), args.Item.Height);
+            TextRenderer.DrawText(args.Graphics, args.Text, args.TextFont, text, color, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         }
         protected override void OnRenderArrow(ToolStripArrowRenderEventArgs args) { args.ArrowColor = args.Item.Enabled ? Theme.Ink : Theme.Muted; base.OnRenderArrow(args); }
         protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs args) {
