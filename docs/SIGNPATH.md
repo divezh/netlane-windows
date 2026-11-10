@@ -108,10 +108,9 @@ git tag v0.5.4
 git push origin v0.5.4
 ```
 
-Workflow выберет `release-signing`, соберёт и подпишет архив. Готовый
-`Netlane-windows-x64-signed.zip` и `.sha256` — это то, что публикуется в
-`netlane-updates`; не забудьте обновить `latest.json` хешем **подписанного**
-архива.
+Workflow выберет `release-signing`, соберёт и подпишет архив и приложит его к
+релизу. Подписанный архив и `latest.json` с его хешем workflow сам выложит в
+ветку `updates`, откуда установленные клиенты берут обновления.
 
 ## Ограничения
 

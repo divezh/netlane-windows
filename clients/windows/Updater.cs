@@ -17,7 +17,12 @@ namespace Netlane {
             string folder = Path.Combine(Root, update.Version);
             Directory.CreateDirectory(folder);
             string zip = Path.Combine(folder, "Netlane-windows-x64.zip");
-            await DownloadAsync(update.Url, zip, progress);
+            try { await DownloadAsync(update.Url, zip, progress); }
+            catch (WebException error) {
+                if (update.Mirror == null) throw;
+                EngineLog.Write("updates: " + update.Url + ": " + error.Message + "; trying the mirror");
+                await DownloadAsync(update.Mirror, zip, progress);
+            }
             string actual;
             using (SHA256 sha = SHA256.Create())
             using (FileStream stream = File.OpenRead(zip))

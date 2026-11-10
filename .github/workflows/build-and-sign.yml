@@ -8,6 +8,9 @@ name: build-and-sign
 # once the repository variables SIGNPATH_ORGANIZATION_ID and SIGNPATH_PROJECT_SLUG and the secret
 # SIGNPATH_API_TOKEN are set (docs/SIGNPATH.md). Until then the build is unsigned but still attested.
 #
+# A published (not pre-) release also becomes the update channel: latest.json and the archive go to the
+# "updates" branch, which installed clients read through raw.githubusercontent.com (UpdateFeed.cs).
+#
 # The engine is signed before the client is built: Netlane.exe pins the engine's SHA-256, so signing the
 # engine afterwards would break the pin.
 
@@ -36,6 +39,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Tag matches the client version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          # A tag that differs from Program.Version would offer the same update again after every install.
+          $match = Select-String -Path clients/windows/Program.cs -Pattern 'internal const string Version = "([^"]+)"'
+          $version = $match.Matches[0].Groups[1].Value
+          if ("v$version" -ne $env:GITHUB_REF_NAME) { throw "Tag $env:GITHUB_REF_NAME does not match Program.Version $version" }
 
       - name: Fetch the patched engine from the pinned public release
         shell: pwsh
@@ -176,3 +188,51 @@ jobs:
           } else {
             gh release create $tag @assets --title "Netlane $version" --notes-file release-notes.md
           }
+
+      - name: Publish to the update channel
+        if: startsWith(github.ref, 'refs/tags/v') && !github.event.release.prerelease
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:GITHUB_REF_NAME
+          $version = $tag.TrimStart('v')
+          $prerelease = gh release view $tag --json isPrerelease --jq .isPrerelease
+          if ($prerelease -eq 'true') { Write-Host 'Pre-release: the update channel is left as it is.'; exit 0 }
+          # The dialog shows one short line: the first points of this version's CHANGELOG section.
+          $lines = Get-Content CHANGELOG.md -Encoding UTF8
+          $start = [Array]::FindIndex($lines, [Predicate[string]]{ param($l) $l -like "## $version*" })
+          $points = @()
+          if ($start -ge 0) {
+            for ($i = $start + 1; $i -lt $lines.Length -and -not $lines[$i].StartsWith('## '); $i++) {
+              if ($lines[$i] -match '^\s*[-*]\s+(.+)$') { $points += ($Matches[1] -replace '[`*]', '').Trim() }
+            }
+          }
+          $notes = ($points -join ' ').Trim()
+          if ($notes.Length -gt 240) { $notes = $notes.Substring(0, 240).TrimEnd() + '…' }
+          if (-not $notes) { $notes = "Netlane $version" }
+          $hash = (Get-FileHash dist/Netlane-windows-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $repo = $env:GITHUB_REPOSITORY
+          $manifest = [ordered]@{
+            version = $version
+            url     = "https://raw.githubusercontent.com/$repo/updates/v$version/Netlane-windows-x64.zip"
+            mirror  = "https://github.com/$repo/releases/download/$tag/Netlane-windows-x64.zip"
+            sha256  = $hash
+            notes   = $notes
+          }
+          # The branch keeps one commit with the current version only, so old archives do not pile up.
+          $channel = Join-Path $env:RUNNER_TEMP channel
+          New-Item -ItemType Directory -Force (Join-Path $channel "v$version") | Out-Null
+          Copy-Item dist/Netlane-windows-x64.zip, dist/Netlane-windows-x64.zip.sha256 (Join-Path $channel "v$version")
+          $json = $manifest | ConvertTo-Json
+          [IO.File]::WriteAllText((Join-Path $channel 'latest.json'), $json + "`n", (New-Object Text.UTF8Encoding $false))
+          Push-Location $channel
+          git init -q -b updates
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -q -m "Канал обновлений: $version"
+          git push --force "https://x-access-token:$env:GH_TOKEN@github.com/$repo.git" updates
+          Pop-Location
+          Write-Host $json

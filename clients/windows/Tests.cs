@@ -602,6 +602,18 @@ namespace Netlane {
             Check((ServicePointManager.SecurityProtocol&SecurityProtocolType.Tls12)!=0,"HTTPS requests offer TLS 1.2 whatever runs first: "+ServicePointManager.SecurityProtocol);
             UpdateManifest parsed=UpdateFeed.Parse(manifest);
             Check(parsed.Version=="0.4.15"&&parsed.Url.EndsWith("Netlane-windows-x64.zip")&&parsed.Sha256.Length==64&&parsed.Notes=="Что нового","Public update manifest parsed: version, archive, checksum and notes.");
+            Check(UpdateFeed.ManifestUrl=="https://raw.githubusercontent.com/divezh/netlane-windows/updates/latest.json"&&UpdateFeed.ReleaseUrl.Contains("/repos/divezh/netlane-windows/releases/latest"),"Updates come from the public netlane-windows repository.");
+            Check(parsed.Mirror==null,"No mirror unless the channel names one.");
+            UpdateManifest mirrored=UpdateFeed.Parse(manifest.Replace("\"notes\"","\"mirror\":\"https://github.com/divezh/netlane-windows/releases/download/v0.4.15/Netlane-windows-x64.zip\",\"notes\""));
+            Check(mirrored.Mirror!=null&&mirrored.Mirror.StartsWith("https://github.com/"),"The channel's mirror is kept for a failed download.");
+            Check(UpdateFeed.Parse(manifest.Replace("\"notes\"","\"mirror\":\"http://example.com/x.zip\",\"notes\"")).Mirror==null,"A non-HTTPS mirror is dropped.");
+            string release="{\"tag_name\":\"v0.7.1\",\"draft\":false,\"prerelease\":false,\"body\":\"## длинные\\n заметки\",\"assets\":[{\"name\":\"Netlane-windows-x64.zip.sha256\",\"browser_download_url\":\"https://github.com/divezh/netlane-windows/releases/download/v0.7.1/Netlane-windows-x64.zip.sha256\",\"digest\":\"sha256:"+new string('b',64)+"\"},{\"name\":\"Netlane-windows-x64.zip\",\"browser_download_url\":\"https://github.com/divezh/netlane-windows/releases/download/v0.7.1/Netlane-windows-x64.zip\",\"digest\":\"sha256:"+new string('A',64)+"\"}]}";
+            UpdateManifest fromRelease=UpdateFeed.ParseRelease(release);
+            Check(fromRelease.Version=="0.7.1"&&fromRelease.Url.EndsWith("/v0.7.1/Netlane-windows-x64.zip")&&fromRelease.Sha256==new string('a',64)&&fromRelease.Notes==null,"The latest GitHub release becomes an update: tag, archive asset and its digest.");
+            bool refused=false;try{UpdateFeed.ParseRelease(release.Replace("\"prerelease\":false","\"prerelease\":true"));}catch(FormatException){refused=true;}
+            Check(refused,"A pre-release is not offered.");
+            refused=false;try{UpdateFeed.ParseRelease(release.Replace(",\"digest\":\"sha256:"+new string('A',64)+"\"",""));}catch(FormatException){refused=true;}
+            Check(refused,"A release asset without a checksum is not offered.");
             RejectFeed(Feed(6,new[]{"main","A","",ams}).Replace("\"version\":1","\"version\":2"),"version 2");
             RejectFeed(Feed(6,new[]{"main","A","",ams},new[]{"n1","B","",fra.Substring(0,fra.Length-6)+"!!!!!!"}),"a broken link in one server");
             RejectFeed(Feed(6,new[]{"n1","A","",ams},new[]{"n1","B","",fra}),"duplicate ids");
