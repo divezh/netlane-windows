@@ -14,14 +14,14 @@ namespace Netlane {
         // validate returns null for an acceptable link or the message to show.
         internal ImportForm(Func<string, string> validate) {
             this.validate = validate;
-            Text = "Импорт профиля"; Icon = AppIcon.Shared; BackColor = Theme.Ground; ForeColor = Theme.Ink; Font = Theme.Font(Theme.BodySize);
+            Text = "Добавить подписку или сервер"; Icon = AppIcon.Shared; BackColor = Theme.Ground; ForeColor = Theme.Ink; Font = Theme.Font(Theme.BodySize);
             AutoScaleDimensions = new SizeF(96, 96); AutoScaleMode = AutoScaleMode.Dpi;
             ClientSize = new Size(480, 300); StartPosition = FormStartPosition.CenterParent; FormBorderStyle = FormBorderStyle.FixedDialog; MaximizeBox = false; MinimizeBox = false; ShowInTaskbar = false;
             TableLayoutPanel layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(Theme.Gutter, 16, Theme.Gutter, 16), ColumnCount = 1, RowCount = 4, BackColor = Theme.Ground };
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
-            Label title = MainForm.TextLabel("Добавить профиль", Theme.HeadingSize, Theme.Ink); title.Font = Theme.Font(Theme.HeadingSize, true);
-            Label hint = MainForm.TextLabel("Вставьте ссылку tt:// или ссылку подписки https://…/sub/… из панели. Подключение не начнётся само.", Theme.SmallSize, Theme.Muted); hint.TextAlign = ContentAlignment.TopLeft;
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
+            Label title = MainForm.TextLabel("Подписка или сервер", Theme.HeadingSize, Theme.Ink); title.Font = Theme.Font(Theme.HeadingSize, true);
+            Label hint = MainForm.TextLabel("Ссылка подписки https://…/sub/… добавит все локации сервера, к уже добавленным. Ссылка tt:// — один сервер. Подключение не начнётся само.", Theme.SmallSize, Theme.Muted); hint.TextAlign = ContentAlignment.TopLeft;
             layout.Controls.Add(title, 0, 0); layout.Controls.Add(hint, 0, 1); layout.Controls.Add(link, 0, 2);
             Button openToml = MainForm.Button("Открыть TOML…", false), cancel = MainForm.Button("Отмена", false), import = MainForm.Button("Импортировать", true);
             TableLayoutPanel buttons = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1, Margin = new Padding(0) };

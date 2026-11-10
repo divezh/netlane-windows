@@ -37,7 +37,7 @@ namespace Netlane {
         readonly Label errorDetail = TextLabel("", Theme.BodySize, Theme.Muted), emptyTitle = TextLabel("", 20f, Theme.Ink), emptySub = TextLabel("", Theme.BodySize, Theme.Muted), emptyHint = TextLabel("Один сервер по ссылке tt:// тоже подойдёт", Theme.CaptionSize, Theme.Faint);
         readonly DarkButton transportButton = (DarkButton)Button("Сменить транспорт…", false), emptyPrimary = (DarkButton)Button("Вставить ссылку", true), emptySecondary = (DarkButton)Button("Открыть файл TOML…", false);
         readonly DarkButton setButton = (DarkButton)Button("", false);
-        readonly LinkLabel pingLink = ActionLink("Проверить пинг"), addLink = ActionLink("Добавить сервер…");
+        readonly LinkLabel pingLink = ActionLink("Проверить пинг"), addLink = ActionLink("Добавить ссылку…");
         readonly MiniSwitch killSwitch = new MiniSwitch { Anchor = AnchorStyles.Right, Margin = new Padding(0), AccessibleName = "Kill Switch" };
         bool refreshingKill;
         string currentPage = "home";

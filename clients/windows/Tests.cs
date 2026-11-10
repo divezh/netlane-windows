@@ -125,7 +125,7 @@ namespace Netlane {
                 Check(all.Any(c=>c is Label&&c.Visible&&c.Text=="↑ 210,0 МБ")&&all.Any(c=>c is Label&&c.Visible&&c.Text=="↓ 1,8 ГБ"),"Connected: sent and received in the session rows.");
                 LocationsTable table=(LocationsTable)all.First(c=>c is LocationsTable);
                 Check(table.Visible&&table.RowCount==2&&table.SelectedName=="Амстердам","Two locations: both are rows of the table: "+table.RowCount);
-                Check(all.Any(c=>c is LinkLabel&&c.Visible&&c.Text=="Проверить пинг")&&all.Any(c=>c is LinkLabel&&c.Visible&&c.Text=="Добавить сервер…"),"Ping check and adding a server sit under the table.");
+                Check(all.Any(c=>c is LinkLabel&&c.Visible&&c.Text=="Проверить пинг")&&all.Any(c=>c is LinkLabel&&c.Visible&&c.Text=="Добавить ссылку…"),"Ping check and adding a server sit under the table.");
                 Check(f.Size.Width==920&&f.Size.Height==560,"Default window is 920 × 560: "+f.Size);
                 List<NavItem> items=all.OfType<NavItem>().Where(c=>c.Visible).ToList();
                 Check(items.Count==MainForm.NavIds.Length&&items.Single(c=>c.Selected).Text=="Подключение","Navigation: six pages, «Подключение» first: "+items.Count);
@@ -261,7 +261,7 @@ namespace Netlane {
             string picked = null; bool add = false;
             using (ServerMenu menu = new ServerMenu(st, new Dictionary<string, string>())) {
                 menu.Picked += delegate(string id) { picked = id; }; menu.AddRequested += delegate { add = true; };
-                Check(menu.RowCount == 3, "Menu: one row per server plus «+ Добавить сервер…».");
+                Check(menu.RowCount == 3, "Menu: one row per server plus «+ Добавить подписку или сервер…».");
                 menu.PickRow(0); menu.PickRow(2);
                 Check(picked == st.Servers[0].Id && add, "Menu rows pick a server or ask to add one.");
             }
@@ -294,7 +294,7 @@ namespace Netlane {
                 settings.SetCountry(selected.Id, "NL"); Check(selected.Country == "NL", "Flag change.");
                 settings.SetCountry(selected.Id, null); Check(selected.Country == null, "«Без флага».");
                 Check(settings.CanDelete(selected, false) && !settings.CanDelete(selected, true) && settings.CanDelete(main.State.Servers[1], true), "Selected server cannot be deleted while the VPN is on.");
-                Check(AllControls(settings).Any(c => c is DarkButton && c.Text == "Вставить ссылку tt://") && AllControls(settings).Any(c => c is DarkButton && c.Text == "Открыть TOML…"), "Import buttons on the servers page.");
+                Check(AllControls(settings).Any(c => c is DarkButton && c.Text == "Добавить по ссылке…") && AllControls(settings).Any(c => c is DarkButton && c.Text == "Открыть TOML…"), "Import buttons on the servers page.");
                 Check(SettingsForm.FastestLabel(new Dictionary<string, long> { { "a", 80 }, { "b", 21 }, { "c", -1 } }) == "b", "Fastest server among answered pings.");
             }
             PreviewRequest sr = PreviewRequest.Parse(new[] { "--render-settings", "x.png", "--page=rules" }); Check(sr.Settings && sr.Page == "rules" && PreviewRequest.Parse(new[] { "--render-settings", "x.png" }).Page == "servers", "Settings preview pages.");
@@ -692,6 +692,25 @@ namespace Netlane {
                 Check(!unobserved, "A late failure of an abandoned task is observed.");
             } finally { TaskScheduler.UnobservedTaskException -= handler; }
         }
+        // A server added by tt:// and a subscription already present do not block one more subscription
+        // from another VPS; both keep their «main» locations apart.
+        static void SecondSubscriptionTests() {
+            string first="https://first.example.com/abcdefghijklmnopqrstuvwxyz/sub/one", other="https://other-vps.example.net/zyxwvutsrqponmlkjihgfedcba/sub/two";
+            using(MainForm form=new MainForm(true)) {
+                form.Show();Application.DoEvents();
+                int before=form.State.Servers.Count, manual=form.State.Servers.Count(s=>s.SubscriptionId==null);
+                Check(form.PasteLink(NodeLink("manual.example.org","password-12345",null))==null&&form.State.Servers.Count==before+1,"A tt:// server is added first: "+before+" -> "+form.State.Servers.Count);
+                form.FeedFetcher=new FakeFetcher{Json=Feed(12,new[]{"main","First","NL",NodeLink("ams.example.com","password-12345",null)})};
+                Check(Wait(form.AddSubscription(first))==null,"A subscription is added next to a tt:// server.");
+                form.FeedFetcher=new FakeFetcher{Json=Feed(12,new[]{"main","Other","DE",NodeLink("fra.example.net","password-67890",null)},new[]{"wars","Other Warsaw","PL",NodeLink("wars.example.net","password-67890",null)})};
+                Check(Wait(form.AddSubscription(other))==null,"A second subscription from another VPS is added.");
+                Check(form.State.Subscriptions.Count==2&&form.State.Servers.Count==before+4&&form.State.Servers.Count(s=>s.SubscriptionId==null)==manual+1,"Both subscriptions and the manual server are kept: "+form.State.Servers.Count);
+                Check(form.State.Servers.Any(s=>s.Name=="First")&&form.State.Servers.Any(s=>s.Name=="Other"),"Each subscription keeps its own «main» location.");
+            }
+            using(ImportForm dialog=new ImportForm(link=>Subscription.LooksLikeUrl(link)?null:"no")) {
+                Check(dialog.Text.Contains("подписку")&&AllControls(dialog).Any(c=>c.Text.Contains("https://…/sub/…")),"The add dialog names subscription links.");
+            }
+        }
         static void EntrySubscriptionRefreshTests() {
             string url="https://first.example.com/abcdefghijklmnopqrstuvwxyz/sub/one";
             string json=Feed(12,new[]{"main","Main","NL",NodeLink("ams.example.com","password-12345",null)},new[]{"wars","Warsaw","PL",NodeLink("wars.example.com","password-12345",null)});
@@ -953,6 +972,7 @@ namespace Netlane {
                 SubscriptionUiTests();
                 HomeSubscriptionRefreshTests();
                 EntrySubscriptionRefreshTests();
+                SecondSubscriptionTests();
                 EngineAvailabilityTests();
                 ConnectionDisposeTests();
                 EngineSpec.Verify();

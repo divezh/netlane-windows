@@ -431,7 +431,7 @@ namespace Netlane {
             using (Font title = Theme.Font(Theme.ServerSize, true)) using (Font small = Theme.Font(Theme.SmallSize)) {
                 int textTop = iconBox.Bottom + (int)Theme.Px(g, 9);
                 TextRenderer.DrawText(g, "Перетащите файл .toml", title, new Rectangle(0, textTop, Width, (int)Theme.Px(g, 20)), Theme.Ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
-                TextRenderer.DrawText(g, "или вставьте ссылку подписки tt:// из панели", small, new Rectangle((int)Theme.Px(g, 20), textTop + (int)Theme.Px(g, 22), Width - (int)Theme.Px(g, 40), (int)Theme.Px(g, 18)),
+                TextRenderer.DrawText(g, "или вставьте ссылку подписки или tt:// из панели", small, new Rectangle((int)Theme.Px(g, 20), textTop + (int)Theme.Px(g, 22), Width - (int)Theme.Px(g, 40), (int)Theme.Px(g, 18)),
                     Theme.Faint, TextFormatFlags.HorizontalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
             }
         }

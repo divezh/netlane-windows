@@ -106,9 +106,9 @@ namespace Netlane {
         Control BuildServersPage() {
             Panel page = new Panel { BackColor = Theme.Ground, AutoScroll = true };
             Label heading = Heading("Серверы"); heading.Dock = DockStyle.Top; heading.Height = 34;
-            Label hint = Hint("Выбранный сервер используется кнопкой на главном экране. Новый профиль добавляется в список, прежние остаются."); hint.Dock = DockStyle.Top; hint.Height = 40;
+            Label hint = Hint("Ссылка подписки https://…/sub/… добавляет все локации своего сервера; подписок с разных серверов может быть несколько. Отдельный сервер — ссылка tt:// или файл TOML. Прежние серверы остаются."); hint.Dock = DockStyle.Top; hint.Height = 58;
             FlowLayoutPanel actions = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 62, WrapContents = false, BackColor = Theme.Ground, Padding = new Padding(0, 16, 0, 0) };
-            Button paste = MainForm.Button("Вставить ссылку tt://", true), toml = MainForm.Button("Открыть TOML…", false);
+            Button paste = MainForm.Button("Добавить по ссылке…", true), toml = MainForm.Button("Открыть TOML…", false);
             paste.Dock = toml.Dock = DockStyle.None; paste.Size = new Size(210, 40); toml.Size = new Size(160, 40); paste.Margin = new Padding(0, 0, 10, 0); toml.Margin = new Padding(0);
             paste.Click += delegate { if (!host.PreviewOnly) host.ImportLink(); }; toml.Click += delegate { if (!host.PreviewOnly) host.ImportFile(); };
             actions.Controls.Add(paste); actions.Controls.Add(toml);
@@ -125,7 +125,7 @@ namespace Netlane {
                 Control row = ServerRow(state.Servers[i], i == 0, state.Servers[i].Id == fastest && state.Servers.Count > 1);
                 row.Dock = DockStyle.Top; row.Height = ServerRowHeight; serverList.Controls.Add(row);
             }
-            if (state.Servers.Count == 0) { Label none = Hint("Серверов пока нет. Вставьте ссылку tt:// из панели или откройте TOML."); none.Dock = DockStyle.Top; none.Height = 40; serverList.Controls.Add(none); }
+            if (state.Servers.Count == 0) { Label none = Hint("Серверов пока нет. Добавьте ссылку подписки или tt:// из панели или откройте TOML."); none.Dock = DockStyle.Top; none.Height = 40; serverList.Controls.Add(none); }
             serverList.Height = Math.Max(40, state.Servers.Count * ServerRowHeight);
             serverList.ResumeLayout();
         }

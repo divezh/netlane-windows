@@ -6,7 +6,7 @@ using System.Windows.Forms;
 
 namespace Netlane {
     // Server list shown over the main window (spec §2): flag, name, ping, a check on the selected
-    // server, and «+ Добавить сервер…». Esc or a click elsewhere closes it.
+    // server, and «+ Добавить подписку или сервер…». Esc or a click elsewhere closes it.
     internal sealed class ServerMenu : Form {
         readonly ClientState state;
         readonly Dictionary<string, string> pings;
@@ -40,7 +40,7 @@ namespace Netlane {
                 if (selected || i == hover) using (GraphicsPath path = Shapes.Round(row, Theme.Px(g, 9))) using (Brush fill = new SolidBrush(selected ? Theme.Selection : Theme.Blend(Theme.LineStrong, Theme.Raised, 40))) g.FillPath(fill, path);
                 if (i == RowCount - 1) {
                     using (Pen line = new Pen(Theme.Line)) g.DrawLine(line, row.Left + 6, row.Top - Padding.Top / 2, row.Right - 6, row.Top - Padding.Top / 2);
-                    TextRenderer.DrawText(g, "+ Добавить сервер…", Font, new Rectangle(row.Left + (int)Theme.Px(g, 12), row.Top, row.Width, row.Height), Theme.Accent, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+                    TextRenderer.DrawText(g, "+ Добавить подписку или сервер…", Font, new Rectangle(row.Left + (int)Theme.Px(g, 12), row.Top, row.Width, row.Height), Theme.Accent, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
                     continue;
                 }
                 Server server = state.Servers[i];
