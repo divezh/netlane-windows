@@ -26,6 +26,12 @@ namespace Netlane {
         public string LatestClientVersion { get; set; }
         public string ClientDownloadUrl { get; set; }
         public string ClientNotes { get; set; }
+        // What the panel says about the access itself (panel 0.5.18+): status, end date, monthly quota.
+        public string AccountStatus { get; set; }
+        public string ExpiresAt { get; set; }
+        public long QuotaBytes { get; set; }
+        public long QuotaUsedBytes { get; set; }
+        public string QuotaMonth { get; set; }
         internal int PendingRefreshes { get; set; }
         public Subscription() { Id = Guid.NewGuid().ToString("N"); UpdateHours = DefaultHours; }
 
@@ -39,6 +45,11 @@ namespace Netlane {
             if (LatestClientVersion != null && (LatestClientVersion.Length > 32 || !Version.TryParse(LatestClientVersion, out offered))) LatestClientVersion = null;
             if (ClientDownloadUrl != null && (!ClientDownloadUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || ClientDownloadUrl.Length > 2048)) ClientDownloadUrl = null;
             if (ClientNotes != null && (ClientNotes.Length > 500 || ClientNotes.Any(Char.IsControl))) ClientNotes = null;
+            if (!Account.KnownStatus(AccountStatus)) AccountStatus = null;
+            DateTime end;
+            if (ExpiresAt != null && (ExpiresAt.Length > 40 || !Account.TryParseDate(ExpiresAt, out end))) ExpiresAt = null;
+            if (QuotaBytes < 0 || QuotaUsedBytes < 0) QuotaBytes = QuotaUsedBytes = 0;
+            if (QuotaMonth != null && !Regex.IsMatch(QuotaMonth, @"\A\d{4}-\d{2}\z")) QuotaMonth = null;
         }
         // https://<host>/…/sub/<token>, as the panel issues them.
         public static bool LooksLikeUrl(string text) {
@@ -59,6 +70,9 @@ namespace Netlane {
         internal List<string> Dns;
         internal long SettingsRevision;
         internal string ClientVersion, ClientUrl, ClientNotes;
+        // Null when the panel is older than 0.5.18 and sends no account block.
+        internal string AccountStatus, ExpiresAt, QuotaMonth;
+        internal long QuotaBytes, QuotaUsedBytes;
 
         internal static SubscriptionFeed Parse(string json) {
             Dictionary<string, object> root;
@@ -86,6 +100,22 @@ namespace Netlane {
                     if (url != null && url.Length <= 2048 && url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) feed.ClientUrl = url;
                     string notes = Text(entry, "notes");
                     if (notes != null && notes.Length <= 500 && !notes.Any(Char.IsControl)) feed.ClientNotes = notes;
+                }
+            }
+            object account;
+            if (root.TryGetValue("account", out account)) {
+                Dictionary<string, object> entry = account as Dictionary<string, object>;
+                string status = entry == null ? null : Text(entry, "status");
+                // An unknown status from a newer panel is ignored rather than breaking the feed.
+                if (Account.KnownStatus(status)) {
+                    feed.AccountStatus = status;
+                    string end = Text(entry, "expires_at");
+                    DateTime parsed;
+                    if (end != null && end.Length <= 40 && Account.TryParseDate(end, out parsed)) feed.ExpiresAt = end;
+                    feed.QuotaBytes = Account.Bytes(entry, "quota_bytes");
+                    feed.QuotaUsedBytes = feed.QuotaBytes > 0 ? Account.Bytes(entry, "quota_used_bytes") : 0;
+                    string month = Text(entry, "quota_month");
+                    if (feed.QuotaBytes > 0 && month != null && Regex.IsMatch(month, @"\A\d{4}-\d{2}\z")) feed.QuotaMonth = month;
                 }
             }
             HashSet<string> ids = new HashSet<string>();
@@ -245,6 +275,8 @@ namespace Netlane {
             sub.LatestClientVersion = feed.ClientVersion;
             sub.ClientDownloadUrl = feed.ClientUrl;
             sub.ClientNotes = feed.ClientNotes;
+            sub.AccountStatus = feed.AccountStatus; sub.ExpiresAt = feed.ExpiresAt; sub.QuotaMonth = feed.QuotaMonth;
+            sub.QuotaBytes = feed.QuotaBytes; sub.QuotaUsedBytes = feed.QuotaUsedBytes;
             if (RuleSets.All(r=>r.Id != SelectedRuleSetId)) SelectedRuleSetId = RuleSets.First(r=>r.Builtin).Id;
             foreach (Server incoming in feed.Servers) {
                 Server existing = mine.FirstOrDefault(m => m.RemoteId == incoming.RemoteId);
@@ -306,6 +338,86 @@ namespace Netlane {
             if (SelectedServerId != null && Servers.Any(x => x.Id == SelectedServerId)) return;
             Server next = Servers.FirstOrDefault(x => !x.Orphaned && preferSubscription != null && x.SubscriptionId == preferSubscription) ?? Servers.FirstOrDefault(x => !x.Orphaned);
             SelectedServerId = next == null ? null : next.Id;
+        }
+    }
+}
+
+namespace Netlane {
+    // How the client talks about the access a subscription gives: the short line under the login,
+    // the details on «Серверы» and the reason when the panel hands out no servers.
+    internal static class Account {
+        internal enum Level { Normal, Warning, Danger }
+        static readonly System.Globalization.CultureInfo Russian = new System.Globalization.CultureInfo("ru-RU");
+        internal static bool KnownStatus(string status) { return status == "active" || status == "pending" || status == "disabled" || status == "expired" || status == "exhausted"; }
+        internal static bool TryParseDate(string text, out DateTime utc) {
+            bool ok = DateTime.TryParse(text, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out utc);
+            return ok && utc.Year >= 2000 && utc.Year <= 2200;
+        }
+        internal static long Bytes(Dictionary<string, object> entry, string key) {
+            object value;
+            if (!entry.TryGetValue(key, out value) || value == null) return 0;
+            try { long n = Convert.ToInt64(value, System.Globalization.CultureInfo.InvariantCulture); return n < 0 ? 0 : n; }
+            catch (FormatException) { return 0; } catch (InvalidCastException) { return 0; } catch (OverflowException) { return 0; }
+        }
+        // 1 ГБ here is 1024³ bytes, as the panel sets quotas.
+        internal static string Size(long bytes) {
+            const double gb = 1024d * 1024 * 1024, mb = 1024d * 1024;
+            if (bytes >= gb) { double v = bytes / gb; return (v < 100 ? v.ToString("0.#", Russian) : Math.Floor(v).ToString("0", Russian)) + " ГБ"; }
+            return Math.Max(0, Math.Round(bytes / mb)).ToString("0", Russian) + " МБ";
+        }
+        static DateTime? End(Subscription s) { DateTime end; return s.ExpiresAt != null && TryParseDate(s.ExpiresAt, out end) ? end : (DateTime?)null; }
+        // The panel no longer gives servers for one of these reasons.
+        internal static bool Blocked(Subscription s) { return s.AccountStatus == "disabled" || s.AccountStatus == "expired" || s.AccountStatus == "pending" || s.AccountStatus == "exhausted"; }
+        internal static string Reason(Subscription s) {
+            DateTime? end = End(s);
+            switch (s.AccountStatus) {
+                case "disabled": return "доступ отключён администратором";
+                case "expired": return end.HasValue ? "доступ истёк " + end.Value.ToLocalTime().ToString("dd.MM.yyyy", Russian) : "срок доступа истёк";
+                case "exhausted": return "трафик на месяц исчерпан";
+                case "pending": return "доступ ещё не включён";
+                default: return null;
+            }
+        }
+        internal static Level LevelOf(Subscription s, DateTime nowUtc) {
+            if (s == null || s.AccountStatus == null) return Level.Normal;
+            if (Blocked(s)) return Level.Danger;
+            DateTime? end = End(s);
+            if (end.HasValue && end.Value - nowUtc <= TimeSpan.FromDays(3)) return Level.Warning;
+            if (s.QuotaBytes > 0 && s.QuotaUsedBytes >= s.QuotaBytes * 0.9) return Level.Warning;
+            return Level.Normal;
+        }
+        // Short, for the line under the login: «до 17.11 · 12 из 50 ГБ».
+        internal static string Summary(Subscription s, DateTime nowUtc) {
+            if (s == null || s.AccountStatus == null) return null;
+            string reason = Reason(s);
+            if (reason != null) return reason;
+            List<string> parts = new List<string>();
+            DateTime? end = End(s);
+            if (end.HasValue) {
+                TimeSpan left = end.Value - nowUtc;
+                parts.Add(left <= TimeSpan.FromDays(1) ? "до " + end.Value.ToLocalTime().ToString("HH:mm", Russian) : "до " + end.Value.ToLocalTime().ToString(end.Value.Year == nowUtc.Year ? "dd.MM" : "dd.MM.yyyy", Russian));
+            }
+            if (s.QuotaBytes > 0) parts.Add(Size(s.QuotaUsedBytes) + " из " + Size(s.QuotaBytes));
+            return parts.Count == 0 ? null : String.Join(" · ", parts);
+        }
+        // Full, for «Серверы»: «Доступ до 17 ноября 2026, 03:00 · Трафик за ноябрь: 12 из 50 ГБ (24%)».
+        internal static string Details(Subscription s) {
+            if (s == null || s.AccountStatus == null) return null;
+            List<string> parts = new List<string>();
+            string reason = Reason(s);
+            if (reason != null) parts.Add(Char.ToUpper(reason[0]) + reason.Substring(1));
+            DateTime? end = End(s);
+            if (end.HasValue && s.AccountStatus != "expired") parts.Add("Доступ до " + end.Value.ToLocalTime().ToString("d MMMM yyyy, HH:mm", Russian));
+            if (!end.HasValue && reason == null) parts.Add("Доступ без срока");
+            if (s.QuotaBytes > 0) {
+                string month = "";
+                DateTime first;
+                if (s.QuotaMonth != null && DateTime.TryParseExact(s.QuotaMonth + "-01", "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out first))
+                    month = " за " + first.ToString("MMMM", Russian).ToLower(Russian);
+                long percent = Math.Min(100, (long)Math.Round(100d * s.QuotaUsedBytes / s.QuotaBytes));
+                parts.Add("Трафик" + month + ": " + Size(s.QuotaUsedBytes) + " из " + Size(s.QuotaBytes) + " (" + percent + "%)");
+            }
+            return String.Join(" · ", parts);
         }
     }
 }

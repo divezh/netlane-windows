@@ -134,6 +134,8 @@ namespace Netlane {
                 return count.Length == 0 ? when : count + " · " + when;
             }
         }
+        // Third line: the access the subscription gives («до 17.11 · 12 из 50 ГБ»); null hides it.
+        internal string AccountText { get { return Account.Summary(source, DateTime.UtcNow); } }
         // Bottom of the navigation: the VPN login, the feed status and a refresh arrow. No card.
         protected override void OnPaint(PaintEventArgs args) {
             Graphics g = Prepare(args);
@@ -147,6 +149,12 @@ namespace Netlane {
             using (Font name = Theme.Font(Theme.BodySize + 0.5f, true)) using (Font small = Theme.Font(Theme.SmallSize)) {
                 TextRenderer.DrawText(g, String.IsNullOrEmpty(accountName) ? "—" : accountName, name, new Rectangle(pad, (int)(9 * scale), Math.Max(0, Width - 2 * pad - icon), (int)(20 * scale)), Theme.Ink, flags);
                 TextRenderer.DrawText(g, StatusText, small, new Rectangle(pad, (int)(29 * scale), Math.Max(0, Width - 2 * pad - icon), (int)(17 * scale)), failed ? Theme.Danger : Theme.Muted, flags);
+                string access = AccountText;
+                if (access != null) {
+                    Account.Level level = Account.LevelOf(source, DateTime.UtcNow);
+                    Color tone = level == Account.Level.Danger ? Theme.Danger : level == Account.Level.Warning ? Theme.Warning : Theme.Muted;
+                    TextRenderer.DrawText(g, access, small, new Rectangle(pad, (int)(46 * scale), Math.Max(0, Width - 2 * pad - icon), (int)(17 * scale)), tone, flags);
+                }
             }
             if (source != null) {
                 float r = 5.5f * scale, x = Width - pad - r, y = Height / 2f + 2 * scale;

@@ -298,6 +298,7 @@ namespace Netlane {
             else ApplyView(Selected == null ? ConnectionView.NoProfile : ConnectionView.Idle, null, "");
             if (previewState.HasValue) ShowPreviewState(previewState.Value);
             if (IsSettingsPage(page) || page == "log") Shown += delegate { Navigate(page); };
+            if (page == "account-servers") Shown += delegate { Navigate("servers"); };
             startupReady = true;
             EngineLog.Write("startup: form ready in " + startupClock.ElapsedMilliseconds + " ms");
             QueueStartup();
@@ -307,6 +308,13 @@ namespace Netlane {
         static ClientState PreviewState(string page, string host) {
             ClientState demo = ClientState.CreateEmpty();
             if (page == "no-servers") return demo;
+            // A subscription whose access ended: the panel hands out no servers and says why.
+            if (page == "expired") {
+                Subscription gone = demo.AddSubscription("https://ams.example.com/abcdefghijklmnopqrstuvwxyz/sub/demo");
+                gone.Name = "\U0001F1F3\U0001F1F1 Amsterdam"; gone.UpdatedAt = DateTime.UtcNow.AddMinutes(-3).ToString("o");
+                gone.AccountStatus = "expired"; gone.ExpiresAt = DateTime.UtcNow.AddDays(-2).ToString("o");
+                return demo;
+            }
             string sample = host ?? "amsterdam.example.com";
             Server main = Server.FromProfile(Profile.Import("hostname = \"" + sample + "\"\naddresses = [\"" + sample + ":443\"]\nusername = \"adm\"\npassword = \"example-password-123\"\n"));
             Server second = Server.FromProfile(Profile.Import("hostname = \"frankfurt.example.com\"\naddresses = [\"frankfurt.example.com:443\"]\nusername = \"admin\"\npassword = \"example-password-123\"\nupstream_protocol = \"http3\"\n"));
@@ -340,10 +348,14 @@ namespace Netlane {
             demo.SelectedRuleSetId = mine.Id;
             if (page == "many-sets") foreach (string name in new[] { "Офис", "Стриминг", "Банки", "Игры" }) demo.AddRuleSet(name, new Routing());
             // A feed refreshed a couple of hours ago: the subscription line needs a demo state to be seen.
-            if (page == "subscribed" || page == "ten-servers") {
+            if (page == "subscribed" || page == "ten-servers" || page == "account" || page == "account-servers") {
                 Subscription sub = demo.AddSubscription("https://ams.example.com/abcdefghijklmnopqrstuvwxyz/sub/demo");
                 sub.Name = "\U0001F1F3\U0001F1F1 Amsterdam";
                 sub.UpdatedAt = DateTime.UtcNow.AddHours(-2).ToString("o");
+                if (page == "account" || page == "account-servers") {
+                    sub.AccountStatus = "active"; sub.ExpiresAt = DateTime.UtcNow.Date.AddDays(12).ToString("o");
+                    sub.QuotaBytes = 50L << 30; sub.QuotaUsedBytes = (long)(12.4 * (1L << 30)); sub.QuotaMonth = DateTime.UtcNow.ToString("yyyy-MM");
+                }
                 foreach (Server item in demo.Servers) item.SubscriptionId = sub.Id;
             }
             return demo;
@@ -393,7 +405,9 @@ namespace Netlane {
             subscriptionRow.ServerCount = server == null ? 0 : VisibleLocations.Count();
             subscriptionRow.SubscriptionName = selectedSubscription == null ? "" : selectedSubscription.DisplayName;
             subscriptionRow.Subscription = selectedSubscription;
-            tips.SetToolTip(subscriptionRow, selectedSubscription == null ? "Сервер добавлен вручную." : subscriptionRow.ActionText);
+            subscriptionRow.Height = subscriptionRow.AccountText == null ? 54 : 70;
+            string accessDetails = Account.Details(selectedSubscription);
+            tips.SetToolTip(subscriptionRow, selectedSubscription == null ? "Сервер добавлен вручную." : subscriptionRow.ActionText + (accessDetails == null ? "" : "\n" + accessDetails));
             setButton.Text = state.SelectedRuleSet.DisplayName;
             dnsValue.Text = selectedSubscription != null && selectedSubscription.ManagedDns != null ? "от администратора" : state.DnsServers != null && state.DnsServers.Count > 0 ? "личный" : "стандартный";
             refreshingKill = true;
@@ -784,7 +798,11 @@ namespace Netlane {
             string subtitle;
             if (view == ConnectionView.Error) subtitle = server == null ? "Проверьте доступ и настройки" : place;
             else if (!String.IsNullOrEmpty(stateNote)) subtitle = stateNote;
-            else if (view == ConnectionView.NoProfile) subtitle = "Вставьте ссылку подписки или файл TOML";
+            else if (view == ConnectionView.NoProfile) {
+                // A subscription that gives no servers says why, instead of «add a server».
+                Subscription blocked = state.Subscriptions.FirstOrDefault(Account.Blocked);
+                subtitle = blocked == null ? "Вставьте ссылку подписки или файл TOML" : "Подписка «" + blocked.DisplayName + "»: " + Account.Reason(blocked);
+            }
             else if (view == ConnectionView.KillSwitch) subtitle = "Снимите Kill Switch, чтобы вернуть доступ";
             else if (view == ConnectionView.Reconnecting) subtitle = "Восстанавливаем соединение";
             else if (view == ConnectionView.Connecting) subtitle = "Ожидаем подтверждения от сервера";

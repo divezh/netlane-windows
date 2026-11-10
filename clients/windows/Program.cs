@@ -6,13 +6,13 @@ using System.Threading;
 using System.Reflection;
 using System.Windows.Forms;
 
-[assembly: AssemblyVersion("0.6.2.0")]
-[assembly: AssemblyFileVersion("0.6.2.0")]
+[assembly: AssemblyVersion("0.6.3.0")]
+[assembly: AssemblyFileVersion("0.6.3.0")]
 [assembly: AssemblyProduct("Netlane Connect")]
 
 namespace Netlane {
     internal static class Program {
-        internal const string Version = "0.6.2";
+        internal const string Version = "0.6.3";
         internal const string ProductName = "Netlane Connect";
         internal static bool Rendering;
         // Autostart runs «Netlane.exe --tray»: a normal start with the window hidden in the tray.
@@ -112,7 +112,7 @@ namespace Netlane {
         internal string Page = "home";
         internal ConnectionView? State;
         internal string Host;
-        internal static readonly string[] Pages = { "home", "settings", "import", "no-servers", "many-sets", "servers-menu", "subscribed", "servers", "rules", "connection", "about", "log", "one-server", "three-servers", "six-servers", "ten-servers" };
+        internal static readonly string[] Pages = { "home", "settings", "import", "no-servers", "many-sets", "servers-menu", "subscribed", "servers", "rules", "connection", "about", "log", "one-server", "three-servers", "six-servers", "ten-servers", "account", "account-servers", "expired" };
         internal bool Settings;
         internal static PreviewRequest Parse(string[] args) {
             if (args == null || args.Length == 0) return null;

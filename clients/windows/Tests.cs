@@ -711,6 +711,49 @@ namespace Netlane {
                 Check(dialog.Text.Contains("подписку")&&AllControls(dialog).Any(c=>c.Text.Contains("https://…/sub/…")),"The add dialog names subscription links.");
             }
         }
+        // The panel's account block (0.5.18+): parsed defensively, carried into the subscription and
+        // shown as a short line, as details on «Серверы» and as the reason when no servers come.
+        static void AccountTests() {
+            string plain=Feed(12,new[]{"main","Main","NL",NodeLink("ams.example.com","password-12345",null)});
+            Func<string,string> with=block=>plain.Substring(0,plain.Length-1)+",\"account\":"+block+"}";
+            DateTime now=DateTime.UtcNow, end=now.Date.AddDays(12);
+            SubscriptionFeed feed=SubscriptionFeed.Parse(with("{\"status\":\"active\",\"expires_at\":\""+end.ToString("yyyy-MM-ddTHH:mm:ssZ")+"\",\"quota_bytes\":53687091200,\"quota_used_bytes\":13314398617,\"quota_month\":\"2026-11\"}"));
+            Check(feed.AccountStatus=="active"&&feed.ExpiresAt!=null&&feed.QuotaBytes==50L<<30&&feed.QuotaUsedBytes==13314398617&&feed.QuotaMonth=="2026-11","Account block parsed: status, end date, quota and use.");
+            Check(SubscriptionFeed.Parse(plain).AccountStatus==null,"A panel without the account block leaves it empty.");
+            SubscriptionFeed odd=SubscriptionFeed.Parse(with("{\"status\":\"vip\",\"quota_bytes\":5}"));
+            Check(odd.AccountStatus==null&&odd.QuotaBytes==0,"An unknown status is ignored, not a broken feed.");
+            SubscriptionFeed bad=SubscriptionFeed.Parse(with("{\"status\":\"active\",\"expires_at\":\"soon\",\"quota_bytes\":-5,\"quota_used_bytes\":\"x\",\"quota_month\":\"11/2026\"}"));
+            Check(bad.AccountStatus=="active"&&bad.ExpiresAt==null&&bad.QuotaBytes==0&&bad.QuotaMonth==null,"Bad account fields are dropped one by one.");
+            ClientState state=ClientState.CreateEmpty();
+            Subscription sub=state.AddSubscription("https://ams.example.com/abcdefghijklmnopqrstuvwxyz/sub/account");
+            state.ApplyFeed(sub.Id,feed,null);
+            Check(sub.AccountStatus=="active"&&sub.QuotaBytes==50L<<30&&sub.ExpiresAt==feed.ExpiresAt,"The account reaches the subscription.");
+            Check(Account.Summary(sub,now)=="до "+end.ToLocalTime().ToString("dd.MM")+" · 12,4 ГБ из 50 ГБ"||Account.Summary(sub,now)=="до "+end.ToLocalTime().ToString("dd.MM.yyyy")+" · 12,4 ГБ из 50 ГБ","Short line: "+Account.Summary(sub,now));
+            Check(Account.LevelOf(sub,now)==Account.Level.Normal,"Twelve days and a quarter of the quota are not a warning.");
+            Check(Account.Details(sub).Contains("Трафик за ноябрь: 12,4 ГБ из 50 ГБ (25%)")&&Account.Details(sub).StartsWith("Доступ до "),"Details: "+Account.Details(sub));
+            Check(Account.LevelOf(sub,end.AddDays(-2))==Account.Level.Warning,"Two days left is a warning.");
+            sub.QuotaUsedBytes=46L<<30; Check(Account.LevelOf(sub,now)==Account.Level.Warning,"90% of the quota is a warning.");
+            Check(Account.Size(512L<<20)=="512 МБ"&&Account.Size(3L<<30)=="3 ГБ"&&Account.Size(25L<<30)=="25 ГБ","Sizes in МБ and ГБ.");
+            // Access ended: no servers, the reason instead of «add a server».
+            DateTime ended=now.AddDays(-2);
+            state.ApplyFeed(sub.Id,SubscriptionFeed.Parse("{\"version\":1,\"servers\":[],\"account\":{\"status\":\"expired\",\"expires_at\":\""+ended.ToString("yyyy-MM-ddTHH:mm:ssZ")+"\"}}"),null);
+            Check(sub.AccountStatus=="expired"&&sub.QuotaBytes==0&&state.Servers.All(x=>x.SubscriptionId!=sub.Id),"An expired account keeps its status with no servers.");
+            Check(Account.Blocked(sub)&&Account.Reason(sub)=="доступ истёк "+ended.ToLocalTime().ToString("dd.MM.yyyy")&&Account.LevelOf(sub,now)==Account.Level.Danger,"Reason: "+Account.Reason(sub));
+            foreach (string[] c in new[]{new[]{"disabled","доступ отключён администратором"},new[]{"exhausted","трафик на месяц исчерпан"},new[]{"pending","доступ ещё не включён"}}) {
+                sub.AccountStatus=c[0]; Check(Account.Reason(sub)==c[1]&&Account.Summary(sub,now)==c[1],"Reason for "+c[0]);
+            }
+            sub.AccountStatus=null; Check(Account.Summary(sub,now)==null&&Account.Details(sub)==null,"No account block, no line.");
+            using(MainForm form=new MainForm(true,"expired",null)) {
+                form.Show();Application.DoEvents();
+                StatusBlock status=AllControls(form).OfType<StatusBlock>().First();
+                Check(status.Subtitle.StartsWith("Подписка «")&&status.Subtitle.Contains("доступ истёк"),"An empty window says why the subscription gives no servers: "+status.Subtitle);
+            }
+            using(MainForm form=new MainForm(true,"account",null)) {
+                form.Show();Application.DoEvents();
+                SubscriptionRow row=AllControls(form).OfType<SubscriptionRow>().First();
+                Check(row.Visible&&row.Height==70&&row.AccountText!=null&&row.AccountText.Contains("из 50 ГБ"),"The login row grows a line for the access: "+row.AccountText);
+            }
+        }
         static void EntrySubscriptionRefreshTests() {
             string url="https://first.example.com/abcdefghijklmnopqrstuvwxyz/sub/one";
             string json=Feed(12,new[]{"main","Main","NL",NodeLink("ams.example.com","password-12345",null)},new[]{"wars","Warsaw","PL",NodeLink("wars.example.com","password-12345",null)});
@@ -973,6 +1016,7 @@ namespace Netlane {
                 HomeSubscriptionRefreshTests();
                 EntrySubscriptionRefreshTests();
                 SecondSubscriptionTests();
+                AccountTests();
                 EngineAvailabilityTests();
                 ConnectionDisposeTests();
                 EngineSpec.Verify();

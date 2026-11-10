@@ -134,22 +134,27 @@ namespace Netlane {
             subscriptionList.SuspendLayout();
             foreach (Control old in subscriptionList.Controls.Cast<Control>().ToList()) old.Dispose();
             subscriptionList.Controls.Clear();
+            int height = 0;
             for (int i = state.Subscriptions.Count - 1; i >= 0; i--) {
                 Control row = SubscriptionRow(state.Subscriptions[i]);
-                row.Dock = DockStyle.Top; row.Height = SubscriptionRowHeight; subscriptionList.Controls.Add(row);
+                // A third line with the access (end date, traffic) when the panel reports it.
+                row.Dock = DockStyle.Top; row.Height = Account.Details(state.Subscriptions[i]) == null ? SubscriptionRowHeight : SubscriptionRowHeight + 20;
+                height += row.Height; subscriptionList.Controls.Add(row);
             }
-            subscriptionList.Height = state.Subscriptions.Count * SubscriptionRowHeight;
+            subscriptionList.Height = height;
             subscriptionList.ResumeLayout();
         }
         Control SubscriptionRow(Subscription sub) {
-            TableLayoutPanel row = new TableLayoutPanel { ColumnCount = 3, RowCount = 2, BackColor = Theme.Ground, Margin = new Padding(0), Padding = new Padding(0, 8, 0, 8) };
+            string access = Account.Details(sub);
+            TableLayoutPanel row = new TableLayoutPanel { ColumnCount = 3, RowCount = access == null ? 2 : 3, BackColor = Theme.Ground, Margin = new Padding(0), Padding = new Padding(0, 8, 0, 8) };
             row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 104)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 156));
-            row.RowStyles.Add(new RowStyle(SizeType.Percent, 55)); row.RowStyles.Add(new RowStyle(SizeType.Percent, 45));
+            if (access == null) { row.RowStyles.Add(new RowStyle(SizeType.Percent, 55)); row.RowStyles.Add(new RowStyle(SizeType.Percent, 45)); }
+            else { row.RowStyles.Add(new RowStyle(SizeType.Percent, 40)); row.RowStyles.Add(new RowStyle(SizeType.Percent, 30)); row.RowStyles.Add(new RowStyle(SizeType.Percent, 30)); }
             int count = state.Servers.Count(x => x.SubscriptionId == sub.Id);
             Label title = MainForm.TextLabel("Подписка «" + sub.DisplayName + "»", Theme.BodySize + 0.75f, Theme.Ink); title.TextAlign = ContentAlignment.BottomLeft;
             string status; Color tone = Theme.Faint;
             if (sub.LastError != null) { status = "Ошибка: " + sub.LastError; tone = Theme.Danger; }
-            else if (count == 0 && sub.UpdatedAt != null) status = "Подписка не даёт серверов: доступ выключен или истёк";
+            else if (count == 0 && sub.UpdatedAt != null) { string reason = Account.Reason(sub); status = "Подписка не даёт серверов: " + (reason ?? "доступ выключен или истёк"); tone = reason != null ? Theme.Danger : tone; }
             else status = "Обновлено " + Updated(sub) + " · серверов: " + count + " · наборов: " + state.RuleSets.Count(r=>r.SubscriptionId==sub.Id)
                 + (sub.ManagedDns == null ? "" : " · DNS администратора");
             Label line = MainForm.TextLabel(status, Theme.SmallSize, tone); line.TextAlign = ContentAlignment.TopLeft; line.AutoEllipsis = true;
@@ -164,7 +169,13 @@ namespace Netlane {
                 if (MessageBox.Show(this, "Удалить подписку «" + sub.DisplayName + "» и её серверы с этого компьютера? Подключённый сервер останется до отключения.", "Подписка", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
                 host.RemoveSubscription(sub.Id);
             };
-            row.Controls.Add(title, 0, 0); row.Controls.Add(line, 0, 1); row.Controls.Add(refresh, 1, 0); row.SetRowSpan(refresh, 2); row.Controls.Add(remove, 2, 0); row.SetRowSpan(remove, 2);
+            row.Controls.Add(title, 0, 0); row.Controls.Add(line, 0, 1); row.Controls.Add(refresh, 1, 0); row.SetRowSpan(refresh, row.RowCount); row.Controls.Add(remove, 2, 0); row.SetRowSpan(remove, row.RowCount);
+            if (access != null) {
+                Account.Level level = Account.LevelOf(sub, DateTime.UtcNow);
+                Label accessLine = MainForm.TextLabel(access, Theme.SmallSize, level == Account.Level.Danger ? Theme.Danger : level == Account.Level.Warning ? Theme.Warning : Theme.Faint);
+                accessLine.TextAlign = ContentAlignment.TopLeft; accessLine.AutoEllipsis = true; tips.SetToolTip(accessLine, access);
+                row.Controls.Add(accessLine, 0, 2);
+            }
             return row;
         }
         static string Updated(Subscription sub) {
