@@ -15,7 +15,7 @@ namespace Netlane {
             TableLayoutPanel box=new TableLayoutPanel{Height=230,ColumnCount=1,RowCount=4,BackColor=Theme.Ground,Margin=new Padding(0)};
             box.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
             foreach(int height in new[]{44,88,46,52})box.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
-            Label hint=Hint("По одному адресу на строку. Пустой список — стандартный DNS движка. Только для запросов через VPN.\nПримеры: 1.1.1.1, tls://1.1.1.1, https://dns.example.com/dns-query.");hint.ForeColor=Theme.Muted;box.Controls.Add(hint,0,0);
+            Label hint=Hint("По одному адресу на строку. Пустой список — стандартный DNS движка. Только для запросов через VPN. Примеры: 1.1.1.1, tls://1.1.1.1, https://dns.example.com/dns-query.");hint.ForeColor=Theme.Muted;box.Controls.Add(hint,0,0);
             dnsInput=new TextBox{Multiline=true,AcceptsReturn=true,ScrollBars=ScrollBars.None,MaxLength=4200,Dock=DockStyle.Fill,BackColor=Theme.Card,ForeColor=Theme.Ink,BorderStyle=BorderStyle.FixedSingle,Margin=new Padding(0,0,0,8),AccessibleName="DNS-серверы для VPN"};
             tips.SetToolTip(dnsInput,"Примеры: 1.1.1.1, 8.8.8.8:53, tls://1.1.1.1, https://dns.example.com/dns-query");box.Controls.Add(dnsInput,0,1);
             FlowLayoutPanel actions=new FlowLayoutPanel{Dock=DockStyle.Fill,WrapContents=false,Margin=new Padding(0),BackColor=Theme.Ground};

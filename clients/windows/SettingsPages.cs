@@ -73,7 +73,7 @@ namespace Netlane {
             stack.Add(log);
             Label logHint = Hint("Пригодится, если подключение не устанавливается: приложите файл к вопросу администратору."); logHint.Height = 30; stack.Add(logHint);
             stack.Add(Group("ЛИЦЕНЗИИ"));
-            Label licenses = Hint("Движок TrustTunnel CLI — Apache-2.0.\nДрайвер Wintun — бинарная лицензия WireGuard LLC.\nПолные тексты — в папке licenses рядом с программой."); licenses.Height = 64; stack.Add(licenses);
+            Label licenses = Hint("Движок TrustTunnel CLI — Apache-2.0.\nДрайвер Wintun — бинарная лицензия WireGuard LLC.\nШрифт Inter — SIL Open Font License 1.1.\nФлаги — Twemoji, CC-BY 4.0.\nПолные тексты — в папке licenses рядом с программой."); licenses.Height = 100; stack.Add(licenses);
             string folder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "licenses");
             LinkLabel licenseLink = Link("Открыть папку лицензий", folder);
             licenseLink.LinkClicked += delegate { Reveal(folder); };
