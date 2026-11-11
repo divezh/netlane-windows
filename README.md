@@ -4,7 +4,7 @@
 
 Лёгкий VPN-клиент для Windows 10 и 11 x64 на базе TrustTunnel. Подключается к собственному серверу по подписке и поддерживает несколько локаций.
 
-<p align="center"><img src="assets/screenshots/windows-client.png" width="760" alt="Главное окно Netlane: навигация слева, состояние, таблица локаций и сессия"></p>
+<p align="center"><img src="assets/screenshots/windows-client.png" width="760" alt="Главное окно Netlane: навигация слева, состояние по центру, таблица локаций и блок подключения"></p>
 
 ## Скачать и подключиться
 
