@@ -1,50 +1,50 @@
-<p align="center"><img src="assets/icon.png" width="88" alt="Netlane"></p>
+<p align="center"><img src="assets/icon.png" width="80" alt="Netlane"></p>
 
 # Netlane для Windows
 
-VPN-клиент для Windows 10 и 11 (x64) на базе [TrustTunnel](https://github.com/TrustTunnel/TrustTunnelClient). Подключается к вашему серверу по ссылке подписки.
+VPN-клиент на базе [TrustTunnel](https://github.com/TrustTunnel/TrustTunnelClient): подписки, наборы правил для сайтов и программ, Kill Switch. Windows 10 и 11 (x64). Версия для Mac — [netlane-macos](https://github.com/divezh/netlane-macos).
 
 <p align="center"><img src="assets/screenshots/windows-client.png" width="760" alt="Главное окно Netlane"></p>
 
 ## Установка
 
-1. Скачайте `Netlane-windows-x64.zip` из [последнего релиза](https://github.com/divezh/netlane-windows/releases/latest).
-2. Распакуйте архив целиком и запустите `Netlane.exe`.
-3. Нажмите «Вставить», чтобы добавить ссылку подписки, затем «Подключиться».
+Скачайте **[Netlane-windows-x64.zip](https://github.com/divezh/netlane-windows/releases/latest/download/Netlane-windows-x64.zip)**, распакуйте целиком и запустите `Netlane.exe`. Затем «Вставить» → ссылка подписки от администратора → «Подключиться».
 
-Ссылку выдаёт администратор сервера. Серверная часть находится в [divezh/netlane](https://github.com/divezh/netlane).
+Файлы не подписаны Authenticode. Если SmartScreen предупредит, нажмите «Подробнее» → «Выполнить в любом случае». Происхождение архива проверяется так:
 
-## Возможности
+```powershell
+gh attestation verify .\Netlane-windows-x64.zip --repo divezh/netlane-windows
+```
 
-- Транспорт HTTP/2 или HTTP/3, автоматический выбор, Anti-DPI, Kill Switch.
-- Несколько серверов в одной подписке, проверка пинга.
-- Правила для доменов, IP и приложений, собственные DNS.
-- Обновления внутри приложения с проверкой SHA-256.
+## Полезное
 
-## Безопасность
+```powershell
+Get-Content "$env:LOCALAPPDATA\Netlane\engine.log" -Tail 50 -Wait   # журнал VPN
+Get-Content "$env:LOCALAPPDATA\Netlane\update.log"                  # журнал обновлений
+explorer "$env:LOCALAPPDATA\Netlane"                                # настройки и подписки (зашифрованы DPAPI)
 
-- Телеметрии нет. Приложение обращается только к вашим серверам и подпискам, к GitHub за обновлениями и к Cloudflare, чтобы показать внешний IP. Показ IP можно отключить в настройках.
-- Профили и ссылки хранятся только на этом компьютере и зашифрованы Windows DPAPI.
-- Файлы не подписаны Authenticode. Происхождение архива можно проверить так:
+# другой VPN занял маршрут по умолчанию и Netlane не подключается (-Restore — вернуть как было)
+powershell -ExecutionPolicy Bypass -File .\clients\windows\fix-other-vpn.ps1
+```
 
-  ```powershell
-  gh attestation verify .\Netlane-windows-x64.zip --repo divezh/netlane-windows
-  ```
+Правило программы — имя файла, например `chrome.exe`, или полный путь к нему. В панели те же правила действуют и на Mac: там `Google Chrome.exe` означает процесс `Google Chrome` вместе с его Helper-процессами.
 
-## Удаление
+**Удаление:** значок в трее → «Выход», затем удалите папку с программой и `%LOCALAPPDATA%\Netlane`. Если был включён автозапуск:
 
-Закройте Netlane (значок в трее → «Выход»), затем удалите папку с программой и `%LOCALAPPDATA%\Netlane`.
+```powershell
+Remove-ItemProperty HKCU:\Software\Microsoft\Windows\CurrentVersion\Run -Name Netlane -ErrorAction SilentlyContinue
+```
 
 ## Сборка
 
-Нужны Windows x64 и .NET Framework 4.8:
+Клиент: C#, WinForms, .NET Framework 4.8, без NuGet.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File clients\windows\build.ps1 -DownloadEngine
 ```
 
-Подробнее о сборке и подписи — в [clients/windows](clients/windows/README.md) и [docs/SIGNING.md](docs/SIGNING.md).
+Так собирается клиент с официальным движком, в нём не работают правила программ и DNS через VPN для всех запросов. Полный движок — TrustTunnel 1.1.11 с патчами из `clients/windows/upstream` (`0001` — правила программ и Kill Switch, `0003` — DNS через VPN). Его собирает Actions (`build-engine-ci.ps1`), а локально — `build-routed-engine.ps1` в окружении MSVC с Conan, CMake, Ninja и NASM. После этого `build.ps1` сам возьмёт собранный движок.
 
-## Лицензия
+Релиз: поднять `Program.Version` и AssemblyVersion, добавить раздел в CHANGELOG, опубликовать релиз `vX.Y.Z`. Actions соберёт архив и обновит канал обновлений.
 
-[MIT](LICENSE). Сторонние компоненты (TrustTunnel, Wintun, Twemoji) перечислены в [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+[MIT](LICENSE) · [сторонние компоненты](THIRD_PARTY_NOTICES.md) · об уязвимостях пишите приватно через [Security advisories](https://github.com/divezh/netlane-windows/security/advisories/new)

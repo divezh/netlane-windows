@@ -1,15 +1,6 @@
 param(
     [switch]$DownloadEngine,
     [string]$RoutedEngine,
-    # Windows 11 Smart App Control may block unknown or unsigned executables.
-    # Use a trusted code-signing certificate for distribution. Signing runs before
-    # the bundled tests, because an unsigned NetlaneTests.exe is blocked there as well.
-    # See clients/windows/sign.ps1 and docs/SIGNING.md.
-    [switch]$Sign,
-    [switch]$TestSign,
-    [string]$SignThumbprint,
-    [string]$SignPfx,
-    [string]$SignPfxPassword,
     [switch]$NoTest
 )
 $ErrorActionPreference = 'Stop'
@@ -37,17 +28,6 @@ if ($RoutedEngine) {
     $taskExpected = Join-Path $taskRoot 'research/windows-client/cmake-build-msvc-relwithdebinfo/trusttunnel/trusttunnel_client.exe'
     if ([IO.Path]::GetFullPath($RoutedEngine) -ne [IO.Path]::GetFullPath($taskExpected) -or !(Test-Path -LiteralPath $taskExpected)) { throw 'Use the engine built from our pinned source and routing patch.' }
     Copy-Item -LiteralPath $taskExpected -Destination (Join-Path $taskOutput 'engine/trusttunnel_client.exe') -Force
-    # Sign the engine before its hash is measured. The client verifies the engine byte for byte, so a
-    # signature added after EngineSpec is generated would invalidate the pinned hash. The official
-    # engine is already signed by its publisher and only our own build ever reaches this branch.
-    if ($Sign -or $TestSign) {
-        $taskEngineSignArguments = @{ Path = (Join-Path $taskOutput 'engine') }
-        if ($TestSign) { $taskEngineSignArguments['TestSign'] = $true }
-        if ($SignThumbprint) { $taskEngineSignArguments['Thumbprint'] = $SignThumbprint }
-        if ($SignPfx) { $taskEngineSignArguments['PfxPath'] = $SignPfx }
-        if ($SignPfxPassword) { $taskEngineSignArguments['PfxPassword'] = $SignPfxPassword }
-        & (Join-Path $PSScriptRoot 'sign.ps1') @taskEngineSignArguments
-    }
     $taskEngineHash = (Get-FileHash -LiteralPath (Join-Path $taskOutput 'engine/trusttunnel_client.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
     $taskGenerated = [IO.File]::ReadAllText($taskEngineSpec).Replace('SupportsApplications = false', 'SupportsApplications = true').Replace('SupportsApplicationNames = false', 'SupportsApplicationNames = true').Replace('Version = "1.1.11"', 'Version = "1.1.11-netlane.2"').Replace('2572f6397ec4a39e018858da593ab278facf9b2e86c7e276753f4845ed78968d', $taskEngineHash)
     $taskEngineSpec = Join-Path $taskCache 'EngineSpec.routed.cs'
@@ -69,24 +49,9 @@ if ($LASTEXITCODE -ne 0) { throw 'Application build failed.' }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'app.config') -Destination (Join-Path $taskOutput 'Netlane.exe.config') -Force
 & $taskCompiler /nologo /utf8output /codepage:65001 /optimize+ /platform:x64 /target:exe /main:Netlane.Tests "@$taskResponse" "/out:$(Join-Path $taskOutput 'NetlaneTests.exe')" @taskReferences @taskSources (Join-Path $PSScriptRoot 'Tests.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Test build failed.' }
-if ($Sign -or $TestSign) {
-    $taskSignArguments = @{ Path = $taskOutput }
-    if ($TestSign) { $taskSignArguments['TestSign'] = $true }
-    if ($SignThumbprint) { $taskSignArguments['Thumbprint'] = $SignThumbprint }
-    if ($SignPfx) { $taskSignArguments['PfxPath'] = $SignPfx }
-    if ($SignPfxPassword) { $taskSignArguments['PfxPassword'] = $SignPfxPassword }
-    & (Join-Path $PSScriptRoot 'sign.ps1') @taskSignArguments
-}
 if (-not $NoTest) {
     & (Join-Path $taskOutput 'NetlaneTests.exe')
     if ($LASTEXITCODE -ne 0) { throw 'Client tests failed.' }
-}
-$taskSignature = Get-AuthenticodeSignature -LiteralPath (Join-Path $taskOutput 'Netlane.exe')
-# The machine that signs need not trust its own certificate: a signature made with the certificate we
-# signed with is enough here, and every user gets trust by installing the exported .cer.
-$taskSignedByUs = $SignThumbprint -and $taskSignature.SignerCertificate -and $taskSignature.SignerCertificate.Thumbprint -eq $SignThumbprint
-if ($taskSignature.Status -ne 'Valid' -and -not $taskSignedByUs) {
-    Write-Warning 'Netlane.exe has no valid Authenticode signature. Smart App Control may block it. Rebuild with -Sign and a code-signing certificate; see docs/SIGNING.md.'
 }
 $taskZip = Join-Path $taskRoot 'artifacts/Netlane-windows-x64.zip'
 $taskPack = @('Netlane.exe','Netlane.exe.config','engine','licenses') | ForEach-Object { Join-Path $taskOutput $_ }
@@ -95,4 +60,3 @@ $taskHash = (Get-FileHash -LiteralPath $taskZip -Algorithm SHA256).Hash.ToLowerI
 [IO.File]::WriteAllText($taskZip + '.sha256', $taskHash + '  Netlane-windows-x64.zip' + "`n", [Text.UTF8Encoding]::new($false))
 Write-Output ('Windows bundle: ' + $taskZip)
 Write-Output ('SHA256: ' + $taskHash)
-Write-Output ('Publisher: ' + $(if ($taskSignature.SignerCertificate) { $taskSignature.SignerCertificate.Subject } else { 'unsigned (may be blocked by Smart App Control)' }))
