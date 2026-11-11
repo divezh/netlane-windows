@@ -1,4 +1,4 @@
-name: build-and-sign
+name: build
 
 # Builds the Windows client on a GitHub-hosted runner, tests it and attests the archive's provenance.
 # Publishing a GitHub Release (tag v*, created on the Releases page) runs it and attaches the archive and
@@ -6,6 +6,9 @@ name: build-and-sign
 # release itself is the update channel. A bare tag push does not build.
 
 on:
+  push:
+    branches: [main]
+  pull_request:
   release:
     types: [published]
   workflow_dispatch:
@@ -117,6 +120,7 @@ jobs:
           Write-Host "Archive SHA-256: $hash"
 
       - name: Attest build provenance
+        if: github.event_name != 'pull_request'
         uses: actions/attest-build-provenance@v3
         with:
           subject-path: dist/Netlane-windows-x64.zip
