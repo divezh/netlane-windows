@@ -26,23 +26,15 @@ namespace Netlane {
     }
 
     internal static class UpdateFeed {
-        // The channel is the "updates" branch of the public repository: the release workflow writes
-        // latest.json and the archive there when a release is published. raw.githubusercontent.com is
-        // what works through restrictive proxies; release-asset downloads redirect to another host that
-        // some of them refuse, so the release asset is only the mirror.
+        // Updates come from one place: the latest published release of the public repository (drafts and
+        // pre-releases are never "latest"). The archive is its asset, checked by the SHA-256 digest GitHub computes.
         internal const string Repository = "divezh/netlane-windows";
-        internal const string ManifestUrl = "https://raw.githubusercontent.com/" + Repository + "/updates/latest.json";
-        // Fallback when the channel cannot be read: the latest published release through the GitHub API.
         internal const string ReleaseUrl = "https://api.github.com/repos/" + Repository + "/releases/latest";
         internal const string AssetName = "Netlane-windows-x64.zip";
 
         internal static async Task<UpdateManifest> FetchAsync() {
-            string channelError;
-            try { return Parse(await GetAsync(ManifestUrl, "application/json")); }
-            catch (FormatException error) { channelError = error.Message; }
-            catch (WebException error) { channelError = error.Message; }
             try { return ParseRelease(await GetAsync(ReleaseUrl, "application/vnd.github+json")); }
-            catch (WebException error) { throw new FormatException("Канал обновлений недоступен: " + channelError + " / " + error.Message); }
+            catch (WebException error) { throw new FormatException("Не удалось узнать последний релиз: " + error.Message); }
         }
 
         static async Task<string> GetAsync(string url, string accept) {
@@ -76,13 +68,20 @@ namespace Netlane {
             if (asset == null) throw new FormatException("В последнем релизе нет " + AssetName + ".");
             string digest = Text(asset, "digest");
             string sha = digest != null && digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase) ? digest.Substring(7) : null;
-            return Validate(tag, Text(asset, "browser_download_url"), sha, null, null);
+            return Validate(tag, Text(asset, "browser_download_url"), sha, ReleaseNotes(Text(root, "body")), null);
         }
 
-        internal static UpdateManifest Parse(string json) {
-            Dictionary<string, object> root = Deserialize(json, 1 << 18);
-            if (root == null) throw new FormatException("Канал обновлений вернул неожиданный ответ.");
-            return Validate(Text(root, "version"), Text(root, "url"), Text(root, "sha256"), Text(root, "notes"), Text(root, "mirror"));
+        // The dialog shows one short line: the points of the release notes (the CHANGELOG section), joined.
+        internal static string ReleaseNotes(string body) {
+            if (body == null) return null;
+            List<string> points = new List<string>();
+            foreach (string raw in body.Replace("\r", "").Split('\n')) {
+                string line = raw.Trim();
+                if (line.StartsWith("- ") || line.StartsWith("* ")) points.Add(line.Substring(2).Replace("`", "").Replace("**", "").Trim());
+            }
+            string notes = String.Join(" ", points).Trim();
+            if (notes.Length > 240) notes = notes.Substring(0, 240).TrimEnd() + "…";
+            return notes.Length == 0 ? null : notes;
         }
 
         static Dictionary<string, object> Deserialize(string json, int limit) {
@@ -99,11 +98,11 @@ namespace Netlane {
         static UpdateManifest Validate(string version, string url, string sha, string notes, string mirror) {
             Version parsed;
             if (version == null || version.Length > 32 || !Version.TryParse(version, out parsed))
-                throw new FormatException("Канал обновлений не указал версию.");
+                throw new FormatException("В последнем релизе нет версии.");
             if (!IsHttps(url))
-                throw new FormatException("Канал обновлений не указал ссылку на архив.");
+                throw new FormatException("В последнем релизе нет ссылки на архив.");
             if (sha == null || !Regex.IsMatch(sha, @"\A[0-9a-fA-F]{64}\z"))
-                throw new FormatException("Канал обновлений не указал SHA-256 архива.");
+                throw new FormatException("У архива в последнем релизе нет SHA-256.");
             if (notes != null) {
                 notes = notes.Trim();
                 if (notes.Length == 0 || notes.Length > 500 || notes.Any(Char.IsControl)) notes = null;

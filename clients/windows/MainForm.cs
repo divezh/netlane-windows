@@ -748,7 +748,7 @@ namespace Netlane {
         }
         UpdateManifest remoteUpdate;
         bool updateDialogOpen;
-        // Two sources: the public update channel and the subscription feed. The newest version wins.
+        // The only source is the latest release of the public repository (the panel's «client» block is ignored).
         internal UpdateManifest AvailableUpdate() {
             Version current;
             if (!Version.TryParse(Program.Version, out current)) return null;
@@ -760,8 +760,6 @@ namespace Netlane {
                 if (bestVersion == null || offered > bestVersion) { bestVersion = offered; best = offer; }
             };
             consider(remoteUpdate);
-            foreach (Subscription sub in state.Subscriptions)
-                consider(new UpdateManifest { Version = sub.LatestClientVersion, Url = sub.ClientDownloadUrl, Notes = sub.ClientNotes });
             return best;
         }
         async Task CheckUpdate() {

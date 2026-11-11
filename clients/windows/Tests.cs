@@ -625,7 +625,6 @@ namespace Netlane {
             ClientState offered=ClientState.CreateEmpty();Subscription offeredSub=offered.AddSubscription("https://ams.example.com/abcdefghijklmnopqrstuvwxyz/sub/offer");
             offered.ApplyFeed(offeredSub.Id,clientFeed,null);
             Check(offeredSub.LatestClientVersion=="9.9.9"&&offeredSub.ClientDownloadUrl=="https://example.com/netlane.zip","A newer client is kept on the subscription.");
-            string manifest="{\"version\":\"0.4.15\",\"url\":\"https://github.com/divezh/netlane-updates/releases/download/v0.4.15/Netlane-windows-x64.zip\",\"sha256\":\"2679abc3d2b95759b4d7814ae71d559f79afdb02de994572428828bc742d89f4\",\"notes\":\"Что нового\"}";
             ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls;Tls.Enable();
             Check((ServicePointManager.SecurityProtocol&SecurityProtocolType.Tls12)!=0,"HTTPS requests offer TLS 1.2 whatever runs first: "+ServicePointManager.SecurityProtocol);
             string upd=Path.Combine(Path.GetTempPath(),"Netlane-test-upd-"+Guid.NewGuid().ToString("N"));
@@ -637,13 +636,8 @@ namespace Netlane {
                 Check(File.ReadAllText(Path.Combine(dst,"Netlane.exe"))=="new"&&File.ReadAllText(Path.Combine(dst,"engine","e.exe"))=="new engine"&&File.ReadAllText(Path.Combine(dst,"keep.txt"))=="kept","An update overwrites the installed files and keeps the rest.");
                 Check(Updater.Apply(Path.Combine(upd,"missing"),-1)==2,"An update into a folder without Netlane.exe is refused.");
             }finally{try{Directory.Delete(upd,true);}catch(Exception){}}
-            UpdateManifest parsed=UpdateFeed.Parse(manifest);
-            Check(parsed.Version=="0.4.15"&&parsed.Url.EndsWith("Netlane-windows-x64.zip")&&parsed.Sha256.Length==64&&parsed.Notes=="Что нового","Public update manifest parsed: version, archive, checksum and notes.");
-            Check(UpdateFeed.ManifestUrl=="https://raw.githubusercontent.com/divezh/netlane-windows/updates/latest.json"&&UpdateFeed.ReleaseUrl.Contains("/repos/divezh/netlane-windows/releases/latest"),"Updates come from the public netlane-windows repository.");
-            Check(parsed.Mirror==null,"No mirror unless the channel names one.");
-            UpdateManifest mirrored=UpdateFeed.Parse(manifest.Replace("\"notes\"","\"mirror\":\"https://github.com/divezh/netlane-windows/releases/download/v0.4.15/Netlane-windows-x64.zip\",\"notes\""));
-            Check(mirrored.Mirror!=null&&mirrored.Mirror.StartsWith("https://github.com/"),"The channel's mirror is kept for a failed download.");
-            Check(UpdateFeed.Parse(manifest.Replace("\"notes\"","\"mirror\":\"http://example.com/x.zip\",\"notes\"")).Mirror==null,"A non-HTTPS mirror is dropped.");
+            Check(UpdateFeed.ReleaseUrl=="https://api.github.com/repos/divezh/netlane-windows/releases/latest","Updates come from the latest release of netlane-windows only.");
+            Check(UpdateFeed.ReleaseNotes("Новое:\n\n- Первое `x`.\n- **Второе**.\n\nПроверка происхождения")=="Первое x. Второе.","Release notes become one short line of points.");
             string release="{\"tag_name\":\"v0.7.1\",\"draft\":false,\"prerelease\":false,\"body\":\"## длинные\\n заметки\",\"assets\":[{\"name\":\"Netlane-windows-x64.zip.sha256\",\"browser_download_url\":\"https://github.com/divezh/netlane-windows/releases/download/v0.7.1/Netlane-windows-x64.zip.sha256\",\"digest\":\"sha256:"+new string('b',64)+"\"},{\"name\":\"Netlane-windows-x64.zip\",\"browser_download_url\":\"https://github.com/divezh/netlane-windows/releases/download/v0.7.1/Netlane-windows-x64.zip\",\"digest\":\"sha256:"+new string('A',64)+"\"}]}";
             UpdateManifest fromRelease=UpdateFeed.ParseRelease(release);
             Check(fromRelease.Version=="0.7.1"&&fromRelease.Url.EndsWith("/v0.7.1/Netlane-windows-x64.zip")&&fromRelease.Sha256==new string('a',64)&&fromRelease.Notes==null,"The latest GitHub release becomes an update: tag, archive asset and its digest.");

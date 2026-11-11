@@ -45,6 +45,6 @@ powershell -ExecutionPolicy Bypass -File clients\windows\build.ps1 -DownloadEngi
 
 Так собирается клиент с официальным движком, в нём не работают правила программ и DNS через VPN для всех запросов. Полный движок — TrustTunnel 1.1.11 с патчами из `clients/windows/upstream` (`0001` — правила программ и Kill Switch, `0003` — DNS через VPN). Его собирает Actions (`build-engine-ci.ps1`), а локально — `build-routed-engine.ps1` в окружении MSVC с Conan, CMake, Ninja и NASM. После этого `build.ps1` сам возьмёт собранный движок.
 
-Релиз: поднять `Program.Version` и AssemblyVersion, добавить раздел в CHANGELOG, опубликовать релиз `vX.Y.Z`. Actions соберёт архив и обновит канал обновлений.
+Релиз: поднять `Program.Version` и AssemblyVersion, добавить раздел в CHANGELOG, опубликовать релиз `vX.Y.Z`. Actions соберёт архив; установленные клиенты увидят его как обновление.
 
 [MIT](LICENSE) · [сторонние компоненты](THIRD_PARTY_NOTICES.md) · об уязвимостях пишите приватно через [Security advisories](https://github.com/divezh/netlane-windows/security/advisories/new)
