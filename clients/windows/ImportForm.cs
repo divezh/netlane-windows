@@ -46,7 +46,7 @@ namespace Netlane {
         }
 
         // Preview only: show an example link in the field.
-        internal void ShowSample() { link.Text = "tt://?AQEBEnR1bm5lbC5leGFtcGxlLmNvbQ…"; link.SelectionStart = link.Text.Length; }
+        internal void ShowSample() { link.Text = "https://vpn.example.com/sub/Xk3pQ9vL2mR8tY4w"; link.SelectionStart = link.Text.Length; }
 
         protected override void OnHandleCreated(EventArgs args) { base.OnHandleCreated(args); int dark = 1; try { Native.DwmSetWindowAttribute(Handle, 20, ref dark, sizeof(int)); } catch (DllNotFoundException) { } }
     }

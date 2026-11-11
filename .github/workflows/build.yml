@@ -108,6 +108,25 @@ jobs:
           & artifacts/windows/Netlane/NetlaneTests.exe
           if ($LASTEXITCODE -ne 0) { throw "Tests failed: $LASTEXITCODE" }
 
+      - name: Screenshots for guides
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force screenshots | Out-Null
+          $exe = Resolve-Path artifacts/windows/Netlane/Netlane.exe
+          foreach ($shot in @(@('no-servers', '--page=no-servers'), @('import', '--page=import'), @('connected', '--state=connected'))) {
+            $out = Join-Path (Resolve-Path screenshots) ($shot[0] + '.png')
+            $p = Start-Process -FilePath $exe -ArgumentList @('--render', $out, $shot[1]) -Wait -PassThru
+            if ($p.ExitCode -ne 0 -or -not (Test-Path $out)) { Write-Warning "screenshot $($shot[0]) failed: $($p.ExitCode)" }
+          }
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v5
+        with:
+          name: screenshots-windows
+          path: screenshots/*.png
+          if-no-files-found: warn
+
       - name: Final archive and SHA-256
         shell: pwsh
         run: |
