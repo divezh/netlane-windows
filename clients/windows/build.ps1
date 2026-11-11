@@ -49,7 +49,7 @@ if ($RoutedEngine) {
         & (Join-Path $PSScriptRoot 'sign.ps1') @taskEngineSignArguments
     }
     $taskEngineHash = (Get-FileHash -LiteralPath (Join-Path $taskOutput 'engine/trusttunnel_client.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
-    $taskGenerated = [IO.File]::ReadAllText($taskEngineSpec).Replace('SupportsApplications = false', 'SupportsApplications = true').Replace('SupportsApplicationNames = false', 'SupportsApplicationNames = true').Replace('Version = "1.1.11"', 'Version = "1.1.11-netlane.1"').Replace('2572f6397ec4a39e018858da593ab278facf9b2e86c7e276753f4845ed78968d', $taskEngineHash)
+    $taskGenerated = [IO.File]::ReadAllText($taskEngineSpec).Replace('SupportsApplications = false', 'SupportsApplications = true').Replace('SupportsApplicationNames = false', 'SupportsApplicationNames = true').Replace('Version = "1.1.11"', 'Version = "1.1.11-netlane.2"').Replace('2572f6397ec4a39e018858da593ab278facf9b2e86c7e276753f4845ed78968d', $taskEngineHash)
     $taskEngineSpec = Join-Path $taskCache 'EngineSpec.routed.cs'
     [IO.File]::WriteAllText($taskEngineSpec, $taskGenerated, [Text.UTF8Encoding]::new($false))
 }

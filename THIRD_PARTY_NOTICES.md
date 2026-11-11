@@ -11,8 +11,8 @@ Limited, лицензия Apache License 2.0.
 - https://github.com/TrustTunnel/TrustTunnelClient
 - Полный текст лицензии: `licenses/LICENSE.txt` в собранном архиве.
 
-В публичной сборке используется собственная сборка движка с патчем маршрутизации по
-приложениям. Исходники патча и инструкция сборки: https://github.com/divezh/netlane-windows
+В публичной сборке используется собственная сборка движка с патчами маршрутизации по
+приложениям и DNS через VPN. Исходники патча и инструкция сборки: https://github.com/divezh/netlane-windows
 (каталог `upstream`).
 
 ## Wintun

@@ -118,7 +118,10 @@ namespace Netlane {
             string listener = socksPort == 0 ? "[listener.tun]\ndevice_name = \"Netlane\"\nchange_system_dns = true\nincluded_routes = [\"0.0.0.0/0\"]\nexcluded_routes = [\"0.0.0.0/8\", \"10.0.0.0/8\", \"169.254.0.0/16\", \"172.16.0.0/12\", \"192.168.0.0/16\", \"224.0.0.0/3\"]\n" : "[listener.socks]\naddress = \"127.0.0.1:" + socksPort + "\"\n";
             if (Routing.Applications.Count > 0 && !EngineSpec.SupportsApplications) throw new FormatException("Для правил приложений нужна сборка Netlane с расширенным движком.");
             if (Routing.Applications.Any(a => a.Name != null) && !EngineSpec.SupportsApplicationNames) throw new FormatException("Правила по имени процесса .exe поддерживаются только в последней сборке Netlane. Обновите полный комплект или используйте выбор приложения по пути.");
-            return "loglevel = \"info\"\nkillswitch_enabled = " + (socksPort == 0 && KillSwitch ? "true" : "false") + "\n" + Routing.EngineConfig() + endpoint + listener;
+            // With DNS servers set (by the user or the panel) the patched engine sends every query to them through the
+            // VPN; otherwise names outside the rule set, applications' lookups included, go to the home resolver.
+            string dnsEverywhere = DnsServers.Count > 0 && EngineSpec.SupportsApplications ? "dns_all_through_vpn = true\n" : "";
+            return "loglevel = \"info\"\nkillswitch_enabled = " + (socksPort == 0 && KillSwitch ? "true" : "false") + "\n" + dnsEverywhere + Routing.EngineConfig() + endpoint + listener;
         }
         static string Quote(string value) { return Json.Serialize(value); }
         public string Serialize() { Validate(); string value=Json.Serialize(this);if(Utf8.GetByteCount(value)>30000)throw new FormatException("Список правил слишком большой для профиля. Сократите длинные домены или пути приложений.");return value; }

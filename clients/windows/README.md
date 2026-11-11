@@ -19,7 +19,7 @@ powershell -ExecutionPolicy Bypass -File clients\windows\build-routed-engine.ps1
 powershell -ExecutionPolicy Bypass -File clients\windows\build.ps1 -DownloadEngine -RoutedEngine "$PWD\research\windows-client\cmake-build-msvc-relwithdebinfo\trusttunnel\trusttunnel_client.exe"
 ```
 
-Патч движка находится в `upstream/`.
+Патчи движка лежат в `upstream/`: `0001` — правила приложений и Kill Switch, `0003` — все DNS-запросы через заданные DNS-серверы (`dns_all_through_vpn`). Тот же `0003` используется в [netlane-macos](https://github.com/divezh/netlane-macos). В Actions движок собирается скриптом `build-engine-ci.ps1` и кэшируется до изменения патчей.
 
 ## Подпись
 

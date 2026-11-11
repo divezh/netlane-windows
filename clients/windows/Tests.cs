@@ -77,6 +77,7 @@ namespace Netlane {
             ClientState state=ClientState.CreateEmpty();state.Servers.Add(Server.FromProfile(Profile.Import(Fixture)));state.SelectServer(state.Servers[0].Id);state.DnsServers=values;
             Profile session=state.SessionProfile();string config=session.EngineConfig(18090);
             Check(config.Contains("dns_upstreams = [\"1.1.1.1\", \"8.8.8.8:53\", \"tls://dns.example.com\"")&&config.IndexOf("dns_upstreams")>config.IndexOf("[endpoint]")&&config.IndexOf("dns_upstreams")<config.IndexOf("[listener.socks]"),"DNS must reach the endpoint section of the real engine config.");
+            Check(config.Contains("dns_all_through_vpn = true")==EngineSpec.SupportsApplications,"With DNS set, the routed engine resolves every name through it.");
             session.DnsServers[0]="9.9.9.9";Check(state.DnsServers[0]=="1.1.1.1","Session must not mutate stored DNS.");
             string dir=Path.Combine(Path.GetTempPath(),"netlane-dns-"+Guid.NewGuid().ToString("N"));
             try{StateStore.Save(dir,state);string notice;ClientState saved=StateStore.LoadOrMigrate(dir,out notice);Check(notice==null&&saved.DnsServers.SequenceEqual(values),"DNS survives encrypted storage round trip.");}

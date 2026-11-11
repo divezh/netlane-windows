@@ -20,11 +20,63 @@ permissions:
   attestations: write
 
 jobs:
-  build:
+  # The routed engine: TrustTunnel Client 1.1.11 built from source with clients/windows/upstream/*.patch.
+  # Cached by the patches and the build script, so it is rebuilt only when they change.
+  engine:
     runs-on: windows-latest
-    env:
-      ENGINE_APP_URL: https://raw.githubusercontent.com/divezh/netlane-updates/main/v0.5.4/Netlane-windows-x64.zip
-      ENGINE_APP_SHA256: c022c6144010a476e471948a1ead9df2608b26913cc4a22824f9f3ee22706adb
+    timeout-minutes: 240
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Cached engine
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: engine-out
+          key: engine-windows-${{ hashFiles('clients/windows/upstream/*.patch', 'clients/windows/build-engine-ci.ps1') }}
+
+      - name: Conan cache
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: conan-windows-${{ hashFiles('clients/windows/upstream/*.patch') }}
+          restore-keys: conan-windows-
+
+      - name: Tools
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          choco install nasm ninja -y --no-progress
+          "C:\Program Files\NASM" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+
+      - name: Visual Studio developer shell
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Build and test the engine
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          # Strawberry Perl's GCC must not be picked up instead of MSVC.
+          $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -notlike '*Strawberry\c\bin*' }) -join ';'
+          ./clients/windows/build-engine-ci.ps1
+          New-Item -ItemType Directory -Force engine-out | Out-Null
+          Copy-Item research/windows-client/cmake-build-msvc-relwithdebinfo/trusttunnel/trusttunnel_client.exe engine-out/ -Force
+
+      - name: Upload engine
+        uses: actions/upload-artifact@v5
+        with:
+          name: engine-windows
+          path: engine-out
+          if-no-files-found: error
+
+  build:
+    needs: engine
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
@@ -39,17 +91,11 @@ jobs:
           $version = $match.Matches[0].Groups[1].Value
           if ("v$version" -ne $env:GITHUB_REF_NAME) { throw "Tag $env:GITHUB_REF_NAME does not match Program.Version $version" }
 
-      - name: Fetch the patched engine from the pinned public release
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          Invoke-WebRequest -UseBasicParsing -Uri $env:ENGINE_APP_URL -OutFile engine-app.zip
-          $actual = (Get-FileHash engine-app.zip -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($actual -ne $env:ENGINE_APP_SHA256) { throw "Engine archive hash mismatch: $actual" }
-          Expand-Archive engine-app.zip -DestinationPath engine-app
-          $target = 'research/windows-client/cmake-build-msvc-relwithdebinfo/trusttunnel/trusttunnel_client.exe'
-          New-Item -ItemType Directory -Force (Split-Path $target) | Out-Null
-          Copy-Item engine-app/engine/trusttunnel_client.exe $target -Force
+      - name: Download engine
+        uses: actions/download-artifact@v5
+        with:
+          name: engine-windows
+          path: research/windows-client/cmake-build-msvc-relwithdebinfo/trusttunnel
 
       - name: Build client
         shell: pwsh
