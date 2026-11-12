@@ -6,13 +6,13 @@ using System.Threading;
 using System.Reflection;
 using System.Windows.Forms;
 
-[assembly: AssemblyVersion("0.7.5.0")]
-[assembly: AssemblyFileVersion("0.7.5.0")]
+[assembly: AssemblyVersion("0.7.6.0")]
+[assembly: AssemblyFileVersion("0.7.6.0")]
 [assembly: AssemblyProduct("Netlane Connect")]
 
 namespace Netlane {
     internal static class Program {
-        internal const string Version = "0.7.5";
+        internal const string Version = "0.7.6";
         internal const string ProductName = "Netlane Connect";
         internal static bool Rendering;
         // Autostart runs «Netlane.exe --tray»: a normal start with the window hidden in the tray.
