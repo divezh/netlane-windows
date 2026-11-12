@@ -121,7 +121,7 @@ namespace Netlane {
             // The caption may be wider than the circle: «Отключиться» was ellipsized once the ring
             // shrank in a short window.
             Rectangle label = new Rectangle(0, (int)(cy + r + Theme.Px(g, 12)), Width, (int)Theme.Px(g, 32));
-            using (Font big = Theme.Font(caption == "Подключиться" ? 12f : 14f)) TextRenderer.DrawText(g, caption, big, label, text, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            using (Font big = Theme.Font(caption == "Подключиться" ? 12f : 14f)) TextRenderer.DrawText(g, caption, big, label, text, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
             if (ShowFocus) using (Pen focus = new Pen(Theme.Accent, 1)) g.DrawEllipse(focus, RectangleF.Inflate(circle, Theme.Px(g, 4), Theme.Px(g, 4)));
         }
     }
@@ -243,7 +243,7 @@ namespace Netlane {
                     using (Pen edge = new Pen(Theme.LineStrong)) g.DrawPath(edge, pill);
                 }
                 Color ink = !Enabled ? Theme.Faint : i == selected ? Theme.Ink : Theme.Muted;
-                TextRenderer.DrawText(g, items[i], Font, Rectangle.Round(area), ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+                TextRenderer.DrawText(g, items[i], Font, Rectangle.Round(area), ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
             }
         }
     }
