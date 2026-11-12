@@ -55,7 +55,7 @@ namespace Netlane {
         readonly MiniSwitch killSwitch = new MiniSwitch { Anchor = AnchorStyles.Right, Margin = new Padding(0), AccessibleName = "Kill Switch" };
         bool refreshingKill;
         // The selected server's transport, the same setting as on «Серверы»; changing it while connected reconnects.
-        readonly SegmentedControl transportSwitch = new SegmentedControl { Items = new[] { "Авто", "HTTP/2", "HTTP/3" }, Anchor = AnchorStyles.Left | AnchorStyles.Right, Height = 28, Margin = new Padding(0, 2, 0, 2), AccessibleName = "Транспорт" };
+        readonly SegmentedControl transportSwitch = new SegmentedControl { Items = new[] { "Авто", "HTTP/2", "HTTP/3" }, Dock = DockStyle.Fill, Margin = new Padding(0, 4, 0, 4), AccessibleName = "Транспорт" };
         internal const string TransportHint = "Авто: сначала HTTP/3, а если сеть его не пропускает — HTTP/2; удачный запоминается. HTTP/3 (QUIC, UDP) ровнее для звонков и видео, HTTP/2 (TCP) — если сеть режет UDP. Во время работы VPN переключение переподключает его.";
         string currentPage = "home";
         SettingsForm settings;
@@ -196,7 +196,7 @@ namespace Netlane {
 
             // Right column: the session, then the route and protection of the next connection.
             sessionPane = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Ground, Margin = new Padding(0) };
-            setButton.Margin = new Padding(0, 3, 0, 3); setButton.Chevron = ChevronDirection.Down; setButton.TextAlign = ContentAlignment.MiddleLeft; setButton.Glyph = ButtonGlyph.None;
+            setButton.Margin = new Padding(0, 4, 0, 4); setButton.Dock = DockStyle.Fill; setButton.Chevron = ChevronDirection.Down; setButton.TextAlign = ContentAlignment.MiddleLeft; setButton.Glyph = ButtonGlyph.None;
             setButton.AccessibleName = "Набор правил";
             // DNS is a link to its settings: the only row here that is changed elsewhere.
             dnsValue.Cursor = Cursors.Hand; dnsValue.ForeColor = Theme.Accent; dnsValue.AccessibleName = "DNS";
@@ -212,7 +212,7 @@ namespace Netlane {
             idleOnly = new[] { (Control)idleHint };
             Control[] session = {
                 sessionCaption, Spacer(2),
-                ipRow, Pair("Набор правил", setButton, 42, 160), Pair("Транспорт", transportSwitch, 40, 196), Lined(Pair("DNS", dnsValue, 36, 160)), Pair("Kill Switch", killSwitch, 36, 60),
+                ipRow, Pair("Набор правил", setButton, 40, RouteControlWidth), Pair("Транспорт", transportSwitch, 40, RouteControlWidth), Lined(Pair("DNS", dnsValue, 36, 160)), Pair("Kill Switch", killSwitch, 36, 60),
                 idleHint, graphGap, speedGraph
             };
             for (int i = session.Length - 1; i >= 0; i--) sessionPane.Controls.Add(session[i]);
@@ -419,6 +419,9 @@ namespace Netlane {
             row.Paint += delegate(object sender, PaintEventArgs args) { using (Pen line = new Pen(Theme.Line)) args.Graphics.DrawLine(line, 0, row.Height - 1, row.Width, row.Height - 1); };
             return row;
         }
+        // «Набор правил» and «Транспорт» share one size, so their edges line up.
+        const int RouteControlWidth = 196;
+
         static TableLayoutPanel Pair(string caption, Control value, int height, int valueWidth) {
             TableLayoutPanel row = new TableLayoutPanel { Dock = DockStyle.Top, Height = height, ColumnCount = 2, RowCount = 1, Margin = new Padding(0), BackColor = Theme.Ground };
             row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, valueWidth));
