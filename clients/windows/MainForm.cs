@@ -420,7 +420,7 @@ namespace Netlane {
             return row;
         }
         // «Набор правил» and «Транспорт» share one size, so their edges line up.
-        const int RouteControlWidth = 196;
+        const int RouteControlWidth = 172;
 
         static TableLayoutPanel Pair(string caption, Control value, int height, int valueWidth) {
             TableLayoutPanel row = new TableLayoutPanel { Dock = DockStyle.Top, Height = height, ColumnCount = 2, RowCount = 1, Margin = new Padding(0), BackColor = Theme.Ground };
