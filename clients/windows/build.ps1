@@ -11,12 +11,12 @@ $taskRoutedDefault = Join-Path $taskRoot 'research/windows-client/cmake-build-ms
 if (-not $RoutedEngine -and (Test-Path -LiteralPath $taskRoutedDefault)) { $RoutedEngine = $taskRoutedDefault }
 $taskCache = Join-Path $taskRoot '.tools/windows-engine'
 $taskArchive = Join-Path $taskCache 'engine.zip'
-$taskArchiveHash = 'c6db992c1164abef1a19a8289173be23d87c6f8c039360dbe9b7fdef89a9e526'
+$taskArchiveHash = '56fb620f4cd30abbc1b4586c6645b56d90c8c0e977ba53d95fb0f542acb7cb1f'
 New-Item -ItemType Directory -Force -Path $taskCache | Out-Null
 if (!(Test-Path -LiteralPath $taskArchive)) {
     if (!$DownloadEngine) { throw 'Run build.ps1 -DownloadEngine to obtain the pinned official engine.' }
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    Invoke-WebRequest -UseBasicParsing -TimeoutSec 120 -Uri 'https://github.com/TrustTunnel/TrustTunnelClient/releases/download/v1.1.11/trusttunnel_client-v1.1.11-windows-x86_64.zip' -OutFile $taskArchive
+    Invoke-WebRequest -UseBasicParsing -TimeoutSec 120 -Uri 'https://github.com/TrustTunnel/TrustTunnelClient/releases/download/v1.1.12/trusttunnel_client-v1.1.12-windows-x86_64.zip' -OutFile $taskArchive
 }
 if ((Get-FileHash -LiteralPath $taskArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $taskArchiveHash) { throw 'Official engine archive checksum mismatch.' }
 Expand-Archive -LiteralPath $taskArchive -DestinationPath $taskCache -Force
@@ -29,7 +29,7 @@ if ($RoutedEngine) {
     if ([IO.Path]::GetFullPath($RoutedEngine) -ne [IO.Path]::GetFullPath($taskExpected) -or !(Test-Path -LiteralPath $taskExpected)) { throw 'Use the engine built from our pinned source and routing patch.' }
     Copy-Item -LiteralPath $taskExpected -Destination (Join-Path $taskOutput 'engine/trusttunnel_client.exe') -Force
     $taskEngineHash = (Get-FileHash -LiteralPath (Join-Path $taskOutput 'engine/trusttunnel_client.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
-    $taskGenerated = [IO.File]::ReadAllText($taskEngineSpec).Replace('SupportsApplications = false', 'SupportsApplications = true').Replace('SupportsApplicationNames = false', 'SupportsApplicationNames = true').Replace('Version = "1.1.11"', 'Version = "1.1.11-netlane.2"').Replace('2572f6397ec4a39e018858da593ab278facf9b2e86c7e276753f4845ed78968d', $taskEngineHash)
+    $taskGenerated = [IO.File]::ReadAllText($taskEngineSpec).Replace('SupportsApplications = false', 'SupportsApplications = true').Replace('SupportsApplicationNames = false', 'SupportsApplicationNames = true').Replace('Version = "1.1.12"', 'Version = "1.1.12-netlane.1"').Replace('2572f6397ec4a39e018858da593ab278facf9b2e86c7e276753f4845ed78968d', $taskEngineHash)
     $taskEngineSpec = Join-Path $taskCache 'EngineSpec.routed.cs'
     [IO.File]::WriteAllText($taskEngineSpec, $taskGenerated, [Text.UTF8Encoding]::new($false))
 }

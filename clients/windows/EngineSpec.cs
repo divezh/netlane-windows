@@ -4,7 +4,7 @@ using System.Security.Cryptography;
 
 namespace Netlane {
     internal static class EngineSpec {
-        internal const string Version = "1.1.11";
+        internal const string Version = "1.1.12";
         internal static readonly bool SupportsApplications = false;
         // Bare process-name rules (Clash PROCESS-NAME) need the routed engine built from the routing patch.
         internal static readonly bool SupportsApplicationNames = false;

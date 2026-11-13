@@ -20,7 +20,7 @@ permissions:
   attestations: write
 
 jobs:
-  # The routed engine: TrustTunnel Client 1.1.11 built from source with clients/windows/upstream/*.patch.
+  # The routed engine: TrustTunnel Client 1.1.12 built from source with clients/windows/upstream/*.patch.
   # Cached by the patches and the build script, so it is rebuilt only when they change.
   engine:
     runs-on: windows-latest

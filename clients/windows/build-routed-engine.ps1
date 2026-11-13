@@ -3,10 +3,10 @@ $taskRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $taskSource = Join-Path $taskRoot 'research/windows-client'
 $taskPatches = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'upstream') -Filter '*.patch' | Sort-Object Name | ForEach-Object { $_.FullName })
 if (!(Test-Path -LiteralPath $taskSource)) {
-    git clone --depth 1 --branch v1.1.11 https://github.com/TrustTunnel/TrustTunnelClient.git $taskSource
+    git clone --depth 1 --branch v1.1.12 https://github.com/TrustTunnel/TrustTunnelClient.git $taskSource
     if ($LASTEXITCODE -ne 0) { throw 'Unable to fetch pinned client source.' }
 }
-if ((git -C $taskSource rev-parse HEAD) -ne 'c0990e174fc75b2e52acd15882c62e69a3022581') { throw 'Unexpected upstream commit.' }
+if ((git -C $taskSource rev-parse HEAD) -ne '067deb837ed994d6ae902e3bb40b69f6266af216') { throw 'Unexpected upstream commit.' }
 # A local rebuild reuses the patched tree and its build cache; CI always starts clean.
 # Windows PowerShell 5.1 turns redirected native stderr into a terminating error under 'Stop'.
 $ErrorActionPreference = 'Continue'
@@ -41,7 +41,7 @@ try {
     $taskMsvcBin = Split-Path -Parent (Get-Command cl.exe -ErrorAction Stop).Source
     if (!(Test-Path -LiteralPath (Join-Path $taskMsvcBin 'link.exe'))) { throw 'MSVC linker is missing.' }
     $env:PATH = $taskMsvcBin + ';' + $env:PATH
-    $env:SKIP_VENV = '1'; $env:SKIP_BOOTSTRAP = '1'; $env:PRESET = 'msvc-relwithdebinfo'; $env:TT_CLIENT_VERSION = '1.1.11-netlane.2'
+    $env:SKIP_VENV = '1'; $env:SKIP_BOOTSTRAP = '1'; $env:PRESET = 'msvc-relwithdebinfo'; $env:TT_CLIENT_VERSION = '1.1.12-netlane.1'
     # Strawberry Perl's Doxygen cannot write under a non-ASCII path (e.g. a folder with an em dash);
     # the docs are not part of the build, so skip it there. CI paths are ASCII and keep the defaults.
     if ($taskSource -match '[^\x00-\x7F]') { $env:CMAKE_ARGS = (($env:CMAKE_ARGS, '-DCMAKE_DISABLE_FIND_PACKAGE_Doxygen=TRUE') -ne $null -ne '') -join ' ' }

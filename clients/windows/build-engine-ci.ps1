@@ -6,11 +6,11 @@
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $source = Join-Path $root 'research/windows-client'
-$commit = 'c0990e174fc75b2e52acd15882c62e69a3022581'
+$commit = '067deb837ed994d6ae902e3bb40b69f6266af216'
 function Check([string]$what) { if ($LASTEXITCODE -ne 0) { throw "$what failed ($LASTEXITCODE)" } }
 
 if (!(Test-Path -LiteralPath (Join-Path $source '.git'))) {
-    git clone --depth 1 --branch v1.1.11 https://github.com/TrustTunnel/TrustTunnelClient.git $source; Check 'clone'
+    git clone --depth 1 --branch v1.1.12 https://github.com/TrustTunnel/TrustTunnelClient.git $source; Check 'clone'
 }
 if ((git -C $source rev-parse HEAD) -ne $commit) { throw 'Unexpected upstream commit.' }
 foreach ($patch in (Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'upstream') -Filter '*.patch' | Sort-Object Name)) {
@@ -20,7 +20,7 @@ foreach ($patch in (Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'upstrea
 
 Push-Location $source
 try {
-    $env:TT_CLIENT_VERSION = '1.1.11-netlane.2'
+    $env:TT_CLIENT_VERSION = '1.1.12-netlane.1'
     python -m pip install -q -r requirements.txt "conan>=2.0.5,<3"; Check 'pip'
     conan profile detect --exist-ok | Out-Null
     python scripts/bootstrap_conan_deps.py; Check 'conan bootstrap'
