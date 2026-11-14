@@ -12,9 +12,17 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag vX.Y.Z to draft from this commit (the tag is created when the draft is published)
+        required: false
+        default: ''
 
 permissions:
   contents: read
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || (startsWith(github.ref, 'refs/tags/v') && github.ref_name) || '' }}
 
 jobs:
   # The routed engine: TrustTunnel Client 1.1.12 built from source with clients/windows/upstream/*.patch.
@@ -88,13 +96,13 @@ jobs:
           persist-credentials: false
 
       - name: Tag matches the client version
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: env.RELEASE_TAG != ''
         shell: pwsh
         run: |
           # A tag that differs from Program.Version would offer the same update again after every install.
           $match = Select-String -Path clients/windows/Program.cs -Pattern 'internal const string Version = "([^"]+)"'
           $version = $match.Matches[0].Groups[1].Value
-          if ("v$version" -ne $env:GITHUB_REF_NAME) { throw "Tag $env:GITHUB_REF_NAME does not match Program.Version $version" }
+          if ("v$version" -ne $env:RELEASE_TAG) { throw "Tag $env:RELEASE_TAG does not match Program.Version $version" }
 
       - name: Download engine
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
@@ -157,14 +165,14 @@ jobs:
           if-no-files-found: error
 
       - name: Draft release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: env.RELEASE_TAG != ''
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $tag = $env:GITHUB_REF_NAME
+          $tag = $env:RELEASE_TAG
           $version = $tag.TrimStart('v')
           # Release notes: the CHANGELOG section of this version.
           $lines = Get-Content CHANGELOG.md -Encoding UTF8
@@ -184,6 +192,6 @@ jobs:
             gh release upload $tag @assets --clobber
             gh release edit $tag --title "Netlane $version" --notes-file release-notes.md
           } else {
-            gh release create $tag @assets --draft --verify-tag --title "Netlane $version" --notes-file release-notes.md
+            gh release create $tag @assets --draft --target $env:GITHUB_SHA --title "Netlane $version" --notes-file release-notes.md
           }
           Write-Host "::notice::Draft $tag is ready: sign Netlane-windows-x64.zip and publish"
