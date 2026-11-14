@@ -12,7 +12,57 @@ namespace Netlane {
     // The public update channel: a small latest.json in a public repository, no token in the client.
     // Url is the main download; Mirror, when set, is tried if the main one fails.
     internal sealed class UpdateManifest {
-        internal string Version, Url, Sha256, Notes, Mirror;
+        internal string Version, Url, Sha256, Notes, Mirror, SignatureUrl;
+    }
+
+    // The owner's release key (ECDSA P-256, SHA-256). Its private half is not on GitHub: an update is
+    // installed only when Netlane-windows-x64.zip.sig verifies with this key, so a stolen GitHub account
+    // cannot ship code to installed apps. The same key signs the server and the macOS client.
+    internal static class ReleaseSignature {
+        static readonly byte[] X = Hex("b5ca1516f75fb306721650eabc73d1e194bbc3140babb8b0347b6ffa7c741817");
+        static readonly byte[] Y = Hex("4cb1f46a37124412e3a6250857f0af3b9f9f5f27cc792bb48554f4f711b3d676");
+
+        internal static bool Verify(byte[] data, byte[] der) {
+            byte[] raw = Raw(der);
+            if (raw == null || data == null) return false;
+            // BCRYPT_ECCPUBLIC_BLOB: "ECS1", key length 32, then X and Y.
+            byte[] blob = new byte[8 + 64];
+            BitConverter.GetBytes(0x31534345).CopyTo(blob, 0);
+            BitConverter.GetBytes(32).CopyTo(blob, 4);
+            X.CopyTo(blob, 8); Y.CopyTo(blob, 40);
+            try {
+                using (System.Security.Cryptography.CngKey key = System.Security.Cryptography.CngKey.Import(blob, System.Security.Cryptography.CngKeyBlobFormat.EccPublicBlob))
+                using (System.Security.Cryptography.ECDsaCng ecdsa = new System.Security.Cryptography.ECDsaCng(key)) {
+                    ecdsa.HashAlgorithm = System.Security.Cryptography.CngAlgorithm.Sha256;
+                    return ecdsa.VerifyData(data, raw);
+                }
+            } catch (System.Security.Cryptography.CryptographicException) { return false; }
+        }
+
+        // openssl writes the signature as DER SEQUENCE { INTEGER r, INTEGER s }; CNG wants r || s, 32 bytes each.
+        internal static byte[] Raw(byte[] der) {
+            if (der == null || der.Length < 8 || der.Length > 72 || der[0] != 0x30 || der[1] != der.Length - 2) return null;
+            byte[] raw = new byte[64];
+            int at = 2;
+            for (int part = 0; part < 2; part++) {
+                if (at + 2 > der.Length || der[at] != 0x02) return null;
+                int length = der[at + 1];
+                at += 2;
+                if (length < 1 || length > 33 || at + length > der.Length) return null;
+                int start = at, count = length;
+                while (count > 0 && der[start] == 0) { start++; count--; }
+                if (count > 32) return null;
+                Buffer.BlockCopy(der, start, raw, part * 32 + 32 - count, count);
+                at += length;
+            }
+            return at == der.Length ? raw : null;
+        }
+
+        static byte[] Hex(string text) {
+            byte[] bytes = new byte[text.Length / 2];
+            for (int i = 0; i < bytes.Length; i++) bytes[i] = Convert.ToByte(text.Substring(i * 2, 2), 16);
+            return bytes;
+        }
     }
 
     // Built with csc.exe directly, the assembly carries no TargetFramework, so .NET Framework offers only
@@ -68,7 +118,13 @@ namespace Netlane {
             if (asset == null) throw new FormatException("В последнем релизе нет " + AssetName + ".");
             string digest = Text(asset, "digest");
             string sha = digest != null && digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase) ? digest.Substring(7) : null;
-            return Validate(tag, Text(asset, "browser_download_url"), sha, ReleaseNotes(Text(root, "body")), null);
+            // An unsigned release is never installed, so it is not offered either.
+            Dictionary<string, object> signature = assets.OfType<Dictionary<string, object>>().FirstOrDefault(a => Text(a, "name") == AssetName + ".sig");
+            string signatureUrl = signature == null ? null : Text(signature, "browser_download_url");
+            if (!IsHttps(signatureUrl)) throw new FormatException("Последний релиз не подписан владельцем.");
+            UpdateManifest manifest = Validate(tag, Text(asset, "browser_download_url"), sha, ReleaseNotes(Text(root, "body")), null);
+            manifest.SignatureUrl = signatureUrl;
+            return manifest;
         }
 
         // The dialog shows one short line: the points of the release notes (the CHANGELOG section), joined.

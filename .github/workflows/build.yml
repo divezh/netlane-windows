@@ -1,23 +1,20 @@
 name: build
 
 # Builds the Windows client on a GitHub-hosted runner, tests it and attests the archive's provenance.
-# Publishing a GitHub Release (tag v*, created on the Releases page) runs it and attaches the archive and
-# its SHA-256 to that release. Installed clients update from the latest release (UpdateFeed.cs), so the
-# release itself is the update channel. A bare tag push does not build.
+# Pushing a tag vX.Y.Z builds it and creates a DRAFT release with the archive and its SHA-256. Installed
+# clients take only a published release whose archive carries the owner's signature (.sig, made off
+# GitHub with the release key), so the owner signs the archive and then publishes the draft
+# (docs: netlane-server/docs/SIGNING.md).
 
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
-  release:
-    types: [published]
   workflow_dispatch:
 
 permissions:
-  actions: read
-  contents: write      # release assets
-  id-token: write      # artifact attestations
-  attestations: write
+  contents: read
 
 jobs:
   # The routed engine: TrustTunnel Client 1.1.12 built from source with clients/windows/upstream/*.patch.
@@ -27,18 +24,20 @@ jobs:
     timeout-minutes: 240
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - name: Cached engine
         id: cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: engine-out
           key: engine-windows-${{ hashFiles('clients/windows/upstream/*.patch', 'clients/windows/build-engine-ci.ps1') }}
 
       - name: Conan cache
         if: steps.cache.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.conan2
           key: conan-windows-${{ hashFiles('clients/windows/upstream/*.patch') }}
@@ -53,7 +52,7 @@ jobs:
 
       - name: Visual Studio developer shell
         if: steps.cache.outputs.cache-hit != 'true'
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
         with:
           arch: x64
 
@@ -68,7 +67,7 @@ jobs:
           Copy-Item research/windows-client/cmake-build-msvc-relwithdebinfo/trusttunnel/trusttunnel_client.exe engine-out/ -Force
 
       - name: Upload engine
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: engine-windows
           path: engine-out
@@ -77,10 +76,16 @@ jobs:
   build:
     needs: engine
     runs-on: windows-latest
+    permissions:
+      contents: write      # the draft release
+      id-token: write      # artifact attestations
+      attestations: write
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - name: Tag matches the client version
         if: startsWith(github.ref, 'refs/tags/v')
@@ -92,7 +97,7 @@ jobs:
           if ("v$version" -ne $env:GITHUB_REF_NAME) { throw "Tag $env:GITHUB_REF_NAME does not match Program.Version $version" }
 
       - name: Download engine
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: engine-windows
           path: research/windows-client/cmake-build-msvc-relwithdebinfo/trusttunnel
@@ -121,7 +126,7 @@ jobs:
           }
 
       - name: Upload screenshots
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: screenshots-windows
           path: screenshots/*.png
@@ -140,22 +145,23 @@ jobs:
 
       - name: Attest build provenance
         if: github.event_name != 'pull_request'
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
         with:
           subject-path: dist/Netlane-windows-x64.zip
 
       - name: Upload archive
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: Netlane-windows-x64
           path: dist/*
           if-no-files-found: error
 
-      - name: Publish release
+      - name: Draft release
         if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           $ErrorActionPreference = 'Stop'
           $tag = $env:GITHUB_REF_NAME
@@ -168,8 +174,16 @@ jobs:
             if ($end -lt 0) { $end = $lines.Length }
             ($lines[($start + 1)..($end - 1)] -join "`n").Trim()
           } else { "Netlane $version" }
-          $notes += "`n`nПроверка происхождения архива: ``gh attestation verify Netlane-windows-x64.zip --repo $env:GITHUB_REPOSITORY``"
+          $notes += "`n`nПодпись владельца: ``openssl dgst -sha256 -verify netlane-release.pub -signature Netlane-windows-x64.zip.sig Netlane-windows-x64.zip``. Происхождение сборки: ``gh attestation verify Netlane-windows-x64.zip --repo $env:GITHUB_REPOSITORY``"
           Set-Content release-notes.md $notes -Encoding UTF8
           $assets = @('dist/Netlane-windows-x64.zip', 'dist/Netlane-windows-x64.zip.sha256')
-          gh release upload $tag @assets --clobber
-          gh release edit $tag --title "Netlane $version" --notes-file release-notes.md
+          # A published release is immutable and already signed: never replace its archive.
+          $existing = gh release view $tag --json isDraft --jq .isDraft 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            if ($existing -ne 'true') { throw "$tag is already published" }
+            gh release upload $tag @assets --clobber
+            gh release edit $tag --title "Netlane $version" --notes-file release-notes.md
+          } else {
+            gh release create $tag @assets --draft --verify-tag --title "Netlane $version" --notes-file release-notes.md
+          }
+          Write-Host "::notice::Draft $tag is ready: sign Netlane-windows-x64.zip and publish"

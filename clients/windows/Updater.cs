@@ -33,6 +33,14 @@ namespace Netlane {
                 try { File.Delete(zip); } catch (IOException) { }
                 throw new FormatException("Контрольная сумма обновления не совпала.");
             }
+            // The owner's signature decides, not GitHub: without it nothing is unpacked or started.
+            if (String.IsNullOrEmpty(update.SignatureUrl)) throw new FormatException("Обновление не подписано владельцем.");
+            string signature = zip + ".sig";
+            await DownloadAsync(update.SignatureUrl, signature, null);
+            if (new FileInfo(signature).Length > 128 || !ReleaseSignature.Verify(File.ReadAllBytes(zip), File.ReadAllBytes(signature))) {
+                try { File.Delete(zip); File.Delete(signature); } catch (IOException) { }
+                throw new FormatException("Подпись обновления не прошла проверку. Обновление не установлено.");
+            }
             string unpacked = Path.Combine(folder, "unpacked");
             if (Directory.Exists(unpacked)) Directory.Delete(unpacked, true);
             ZipFile.ExtractToDirectory(zip, unpacked);

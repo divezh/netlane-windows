@@ -639,7 +639,17 @@ namespace Netlane {
             Check(UpdateFeed.ReleaseUrl=="https://api.github.com/repos/divezh/netlane-windows/releases/latest","Updates come from the latest release of netlane-windows only.");
             Check(UpdateFeed.ReleaseNotes("Новое:\n\n- Первое `x`.\n- **Второе**.\n\nПроверка происхождения")=="Первое x. Второе.","Release notes become one short line of points.");
             string release="{\"tag_name\":\"v0.7.1\",\"draft\":false,\"prerelease\":false,\"body\":\"## длинные\\n заметки\",\"assets\":[{\"name\":\"Netlane-windows-x64.zip.sha256\",\"browser_download_url\":\"https://github.com/divezh/netlane-windows/releases/download/v0.7.1/Netlane-windows-x64.zip.sha256\",\"digest\":\"sha256:"+new string('b',64)+"\"},{\"name\":\"Netlane-windows-x64.zip\",\"browser_download_url\":\"https://github.com/divezh/netlane-windows/releases/download/v0.7.1/Netlane-windows-x64.zip\",\"digest\":\"sha256:"+new string('A',64)+"\"}]}";
+            bool unsignedRefused=false;try{UpdateFeed.ParseRelease(release);}catch(FormatException){unsignedRefused=true;}
+            Check(unsignedRefused,"A release without the owner's signature is not offered.");
+            release=release.Replace("\"assets\":[","\"assets\":[{\"name\":\"Netlane-windows-x64.zip.sig\",\"browser_download_url\":\"https://github.com/divezh/netlane-windows/releases/download/v0.7.1/Netlane-windows-x64.zip.sig\"},");
+            // A message signed with the real release key (openssl dgst -sha256 -sign): the app accepts it and nothing else.
+            byte[] probe=Encoding.UTF8.GetBytes("netlane signing check\n"),probeSig=Convert.FromBase64String("MEUCIEJ+pSkbXE6GxT5tJL+qDIzjdrIpgm4T1bV7pHGCHBP6AiEAkj/oowSb6uMMXTUuZM3AgVp8dxPMDN/9Ce8imW6e/cA=");
+            Check(ReleaseSignature.Verify(probe,probeSig),"The owner's signature verifies.");
+            Check(!ReleaseSignature.Verify(Encoding.UTF8.GetBytes("netlane signing check!\n"),probeSig),"A changed file fails the signature.");
+            byte[] bent=(byte[])probeSig.Clone();bent[bent.Length-1]^=1;Check(!ReleaseSignature.Verify(probe,bent),"A changed signature fails.");
+            Check(!ReleaseSignature.Verify(probe,new byte[]{0x30,0x00})&&ReleaseSignature.Raw(new byte[3])==null,"Garbage is not a signature.");
             UpdateManifest fromRelease=UpdateFeed.ParseRelease(release);
+            Check(fromRelease.SignatureUrl!=null&&fromRelease.SignatureUrl.EndsWith("/v0.7.1/Netlane-windows-x64.zip.sig"),"The signature asset comes with the update.");
             Check(fromRelease.Version=="0.7.1"&&fromRelease.Url.EndsWith("/v0.7.1/Netlane-windows-x64.zip")&&fromRelease.Sha256==new string('a',64)&&fromRelease.Notes==null,"The latest GitHub release becomes an update: tag, archive asset and its digest.");
             bool refused=false;try{UpdateFeed.ParseRelease(release.Replace("\"prerelease\":false","\"prerelease\":true"));}catch(FormatException){refused=true;}
             Check(refused,"A pre-release is not offered.");

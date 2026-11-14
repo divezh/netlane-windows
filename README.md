@@ -10,9 +10,10 @@ VPN-клиент на базе [TrustTunnel](https://github.com/TrustTunnel/Trus
 
 Скачайте **[Netlane-windows-x64.zip](https://github.com/divezh/netlane-windows/releases/latest/download/Netlane-windows-x64.zip)**, распакуйте целиком и запустите `Netlane.exe`. Затем «Вставить» → ссылка подписки от администратора → «Подключиться».
 
-Файлы не подписаны Authenticode. Если SmartScreen предупредит, нажмите «Подробнее» → «Выполнить в любом случае». Происхождение архива проверяется так:
+Файлы не подписаны Authenticode. Если SmartScreen предупредит, нажмите «Подробнее» → «Выполнить в любом случае». Каждый архив подписан ключом владельца ([`netlane-release.pub`](netlane-release.pub), SHA-256 ключа `8c6ed42d…8a8136`); приложение ставит обновления только с этой подписью. Проверка вручную:
 
 ```powershell
+openssl dgst -sha256 -verify netlane-release.pub -signature Netlane-windows-x64.zip.sig Netlane-windows-x64.zip
 gh attestation verify .\Netlane-windows-x64.zip --repo divezh/netlane-windows
 ```
 

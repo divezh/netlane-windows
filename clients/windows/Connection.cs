@@ -147,6 +147,9 @@ namespace Netlane {
             Process engine = null;
             bool started = false;
             bool signaled = false;
+            // The verified engine files stay open without write or delete sharing until the engine
+            // exits: they cannot be swapped between the hash check and the start (EngineSpec.Hold).
+            IDisposable engineFiles = null;
             object outputLock = new object();
             using (NamedPipeClientStream pipe = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous)) {
                 StreamWriter output = null;
@@ -167,8 +170,8 @@ namespace Netlane {
                         EngineLog.Start("connect protocol=" + request.Profile.Protocol + " socks=" + request.SocksPort + " admin=" + Native.IsAdmin() + " engine=" + EngineSpec.Version);
                         if (request.SocksPort == 0 && !Native.IsAdmin()) { EngineLog.Write("worker: not elevated, refusing TUN"); send("ADMIN_REQUIRED"); return 2; }
                         EngineLog.Write("worker: verifying pinned engine hashes");
-                        EngineSpec.Verify();
-                        EngineLog.Write("worker: engine hashes ok");
+                        engineFiles = EngineSpec.Hold();
+                        EngineLog.Write("worker: engine hashes ok, files held");
                         DirectorySecurity acl = new DirectorySecurity();
                         acl.SetAccessRuleProtection(true, false);
                         acl.AddAccessRule(new FileSystemAccessRule(WindowsIdentity.GetCurrent().User, FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
@@ -227,6 +230,7 @@ namespace Netlane {
                         if (directory != null) { try { File.Delete(Path.Combine(directory, "session.toml")); Directory.Delete(directory); } catch (IOException) {} }
                     }
                     if (engine != null) engine.Dispose();
+                    if (engineFiles != null) engineFiles.Dispose();
                     Native.FreeConsole();
                 }
             }
