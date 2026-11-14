@@ -527,14 +527,17 @@ namespace Netlane {
             if (generation != ipGeneration || IsDisposed) return;
             bool throughVpn = view == ConnectionView.Connected;
             try {
-                PublicIp result;
+                PublicIp result = null;
                 // Right after connecting the network is still settling: one quiet retry before reporting a failure.
-                try { result = await PublicIp.FetchAsync(); }
-                catch (System.Net.WebException first) {
-                    EngineLog.Write("public ip: " + first.Message + "; retrying");
+                // (C# 5 of csc.exe has no await inside catch, hence the loop.)
+                for (int attempt = 0; result == null; attempt++) {
+                    string retry = null;
+                    try { result = await PublicIp.FetchAsync(); }
+                    catch (System.Net.WebException first) { if (attempt > 0) throw; retry = first.Message; }
+                    if (retry == null) continue;
+                    EngineLog.Write("public ip: " + retry + "; retrying");
                     await Task.Delay(1500);
                     if (generation != ipGeneration || IsDisposed) return;
-                    result = await PublicIp.FetchAsync();
                 }
                 if (generation != ipGeneration || IsDisposed) return;
                 publicIp = result; ipThroughVpn = throughVpn;
