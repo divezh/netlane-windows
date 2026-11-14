@@ -20,6 +20,10 @@ namespace Netlane {
             request.Timeout = 8000;
             request.ReadWriteTimeout = 8000;
             request.CachePolicy = new System.Net.Cache.RequestCachePolicy(System.Net.Cache.RequestCacheLevel.NoCacheNoStore);
+            // A fresh connection every time: a kept-alive one from before the VPN came up is cut when the
+            // routes change, and .NET then reports «Запрос был прерван: Запрос отменен» right after connecting.
+            request.KeepAlive = false;
+            request.ConnectionGroupName = "public-ip-" + Guid.NewGuid().ToString("N");
             Task<WebResponse> pending = request.GetResponseAsync();
             if (await Task.WhenAny(pending, Task.Delay(9000)) != pending) { request.Abort(); throw new TimeoutException("Проверка IP не ответила."); }
             using (WebResponse response = await pending)

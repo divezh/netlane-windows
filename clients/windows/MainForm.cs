@@ -527,7 +527,15 @@ namespace Netlane {
             if (generation != ipGeneration || IsDisposed) return;
             bool throughVpn = view == ConnectionView.Connected;
             try {
-                PublicIp result = await PublicIp.FetchAsync();
+                PublicIp result;
+                // Right after connecting the network is still settling: one quiet retry before reporting a failure.
+                try { result = await PublicIp.FetchAsync(); }
+                catch (System.Net.WebException first) {
+                    EngineLog.Write("public ip: " + first.Message + "; retrying");
+                    await Task.Delay(1500);
+                    if (generation != ipGeneration || IsDisposed) return;
+                    result = await PublicIp.FetchAsync();
+                }
                 if (generation != ipGeneration || IsDisposed) return;
                 publicIp = result; ipThroughVpn = throughVpn;
             } catch (Exception error) {
