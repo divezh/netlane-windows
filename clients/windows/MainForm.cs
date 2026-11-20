@@ -49,6 +49,9 @@ namespace Netlane {
         // «Авто»: the transport being tried for this start, whether the other one was tried already, and a watch.
         string autoAttempt;
         bool autoFellBack;
+        // The server refused the credentials in this session: no transport fallback, and the reason stays on screen.
+        bool accessDenied;
+        internal const string AccessDeniedText = "Сервер отказал в доступе: администратор отключил пользователя, истёк срок доступа, закончилась квота или сменился пароль. Обратитесь к администратору.";
         int autoGeneration;
         readonly Timer pingNoteTimer = new Timer { Interval = 30 * 1000 };
         DateTime lastPingCheck = DateTime.MinValue;
@@ -1176,7 +1179,7 @@ namespace Netlane {
             try { session = state.SessionProfile(); } catch (FormatException error) { Error(error.Message); return; }
             if (session.Routing.Applications.Count > 0 && !EngineSpec.SupportsApplications) { Error("Эта сборка не поддерживает правила приложений. Используйте полный комплект Netlane Connect."); return; }
             string startedServer = state.SelectedServerId, startedSet = state.SelectedRuleSet.Id;
-            busy = true; failed = false; reconnectAttempts = 0; retrySeconds = 0; ApplyView(ConnectionView.Connecting, null, "Подтвердите запрос Windows на запуск VPN."); ControlsEnabled();
+            busy = true; failed = false; accessDenied = false; reconnectAttempts = 0; retrySeconds = 0; ApplyView(ConnectionView.Connecting, null, "Подтвердите запрос Windows на запуск VPN."); ControlsEnabled();
             try { await connection.StartAsync(session, true, 0); Note("Ожидаем подтверждения от VPN-сервера…"); }
             catch (System.ComponentModel.Win32Exception error) { Error(error.NativeErrorCode == 1223 ? "Запрос прав администратора отменён. VPN не включён." : "Не удалось запустить VPN. Распакуйте приложение заново."); }
             catch (Exception error) { EngineLog.Write("connect failed: " + error); Error("Не удалось запустить движок: " + error.Message); }
@@ -1189,9 +1192,11 @@ namespace Netlane {
             if (IsDisposed || !IsHandleCreated) return;
             BeginInvoke((Action)delegate {
                 if (IsDisposed) return;
-                if (engineState == "CONNECTED") { if (autoAttempt != null && Selected != null && Selected.AutoTransport) { Selected.AutoProtocol = autoAttempt; SaveState(); } autoAttempt = null; autoGeneration++; CheckIp(2000); failed = false; tunnelWarning = null; retrySeconds = 0; ApplyView(ConnectionView.Connected, null, ""); connectedAt = DateTime.UtcNow; traffic = new TrafficMeter(new AdapterTraffic()); traffic.Start(); UpdateSession(); timer.Start(); tray.Text = Program.ProductName + " · Подключено"; TrackTunnel(); if (announceSwitch && Selected != null) trayMenu.Notify(Program.ProductName, "Подключено: " + Selected.Name); announceSwitch = false; }
+                if (engineState == "CONNECTED") { if (autoAttempt != null && Selected != null && Selected.AutoTransport) { Selected.AutoProtocol = autoAttempt; SaveState(); } autoAttempt = null; autoGeneration++; CheckIp(2000); failed = false; accessDenied = false; tunnelWarning = null; retrySeconds = 0; ApplyView(ConnectionView.Connected, null, ""); connectedAt = DateTime.UtcNow; traffic = new TrafficMeter(new AdapterTraffic()); traffic.Start(); UpdateSession(); timer.Start(); tray.Text = Program.ProductName + " · Подключено"; TrackTunnel(); if (announceSwitch && Selected != null) trayMenu.Notify(Program.ProductName, "Подключено: " + Selected.Name); announceSwitch = false; }
                 else if (engineState.StartsWith("RECONNECTING")) { reconnectAttempts++; if (reconnectAttempts == 1) trayMenu.Notify(Program.ProductName, "Соединение потеряно, переподключаюсь"); int pause = 5; Int32.TryParse(engineState.IndexOf(':') >= 0 ? engineState.Substring(engineState.IndexOf(':') + 1) : "", out pause); retrySeconds = pause > 0 ? pause : 5; ApplyView(ConnectionView.Reconnecting, null, "Переподключение: попытка " + reconnectAttempts + " через " + retrySeconds + " с"); timer.Start(); tray.Text = Program.ProductName + " · Переподключение"; }
-                else if (engineState == "KILL_SWITCH_ACTIVE") { failed = true; timer.Stop(); ApplyView(ConnectionView.KillSwitch, null, "Нажмите «Отключиться», чтобы снять блокировку интернета."); tray.Text = Program.ProductName + " · Kill Switch"; trayMenu.Notify(Program.ProductName, "Интернет заблокирован: Kill Switch удерживает защиту"); }
+                else if (engineState == "ACCESS_DENIED") { accessDenied = true; Error(AccessDeniedText); tray.Text = Program.ProductName + " · Доступ закрыт"; }
+                else if (engineState == "KILL_SWITCH_ACTIVE") { failed = true; timer.Stop(); ApplyView(ConnectionView.KillSwitch, null, accessDenied ? "Доступ закрыт сервером. Нажмите «Отключиться», чтобы вернуть интернет." : "Нажмите «Отключиться», чтобы снять блокировку интернета."); tray.Text = Program.ProductName + " · Kill Switch"; trayMenu.Notify(Program.ProductName, accessDenied ? "Доступ закрыт сервером. Интернет заблокирован Kill Switch." : "Интернет заблокирован: Kill Switch удерживает защиту"); }
+                else if ((engineState == "CONNECTION_ERROR" || engineState == "WORKER_ERROR") && accessDenied) { }
                 else if ((engineState == "CONNECTION_ERROR" || engineState == "WORKER_ERROR") && StartFallback()) { }
                 else if (engineState == "CONNECTION_ERROR" || engineState == "WORKER_ERROR" || engineState == "ADMIN_REQUIRED") Error("Соединение не установлено. Проверьте доступ, срок, квоту и выбранный транспорт.");
                 else if (engineState == "STOP_FAILED") Error("VPN не подтвердил остановку. Дождитесь завершения, прежде чем выходить.");

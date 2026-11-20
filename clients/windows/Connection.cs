@@ -126,6 +126,9 @@ namespace Netlane {
         // Engine log lines carry a level. Only ERROR lines can mean a failed connection: INFO and WARN
         // lines also say "Failed to" for routine events, e.g. DNS sent directly in selective mode.
         // Lines without a level (CLI messages) keep the plain checks.
+        // The endpoint refused the credentials (HTTP 407): the user is disabled, expired, out of quota, removed or
+        // the password changed. Engine 1.3.0 reports it as "Error: 5 Authorization Required" on both transports.
+        internal static bool IsAccessDenied(string line) { return IsEngineFailure(line) && line.Contains("Authorization Required"); }
         internal static bool IsEngineFailure(string line) {
             Match level = LogLevel.Match(line);
             if (level.Success && level.Groups[1].Value != "ERROR") return false;
@@ -193,6 +196,7 @@ namespace Netlane {
                             if (line.Contains("Successfully connected to endpoint")) send("CONNECTED");
                             else if (line.Contains("Waiting recovery:")) send("RECONNECTING:" + RecoverySeconds(line));
                             else if (line.Contains("Kill switch active; awaiting explicit stop")) send("KILL_SWITCH_ACTIVE");
+                            else if (IsAccessDenied(line)) send("ACCESS_DENIED");
                             else if (IsEngineFailure(line)) send("CONNECTION_ERROR");
                         };
                         engine.OutputDataReceived += observe; engine.ErrorDataReceived += observe;

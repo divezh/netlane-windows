@@ -1052,6 +1052,11 @@ namespace Netlane {
                 Check(Worker.IsEngineFailure("03.11.2026 15:35:28.561360 ERROR [4432] VPNCORE connect: Failed to connect to endpoint"), "Engine ERROR line is a failure.");
                 Check(Worker.IsEngineFailure("Error: invalid config") && Worker.IsEngineFailure("Cannot create route to 10.0.0.0/8"), "Unprefixed engine errors are failures.");
                 Check(!Worker.IsEngineFailure("03.11.2026 15:35:28.575811 INFO  [4432] TRUSTTUNNEL_CLIENT_APP operator (): Successfully connected to endpoint"), "Connected line is not a failure.");
+                // Engine 1.3.0 on a refused user (disabled, expired, quota, removed or wrong password), both transports.
+                Check(Worker.IsAccessDenied("20.11.2026 19:45:35.285191 ERROR [34512] TRUSTTUNNEL_CLIENT_APP operator (): Error: 5 Authorization Required"), "Refused credentials are an access denial.");
+                Check(!Worker.IsAccessDenied("20.11.2026 19:45:35.285151 INFO  [34512] UPSTREAM_MUX child_upstream_handler: [3] Error on upstream id=0 is fatal, closing all upstreams: (5) Authorization Required"), "The INFO line before it is not reported twice.");
+                Check(!Worker.IsAccessDenied("03.11.2026 15:35:28.561360 ERROR [4432] VPNCORE connect: Failed to connect to endpoint"), "Other connection errors are not an access denial.");
+                Check(MainForm.AccessDeniedText.Contains("администратор"), "The access denial points the user to the administrator.");
                 DnsTests();
                 StateTests();
                 SubscriptionTests();
