@@ -17,6 +17,8 @@ foreach ($patch in (Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'upstrea
     git -C $source apply $patch.FullName; Check "patch $($patch.Name)"
     Write-Output "Applied $($patch.Name)"
 }
+git -C $source add -N trusttunnel/include/vpn/trusttunnel/application_routes.h trusttunnel/include/vpn/trusttunnel/session_policy.h trusttunnel/src/application_routes.cpp trusttunnel/test/test_application_routes.cpp
+Check 'register routing sources for lint'
 
 Push-Location $source
 try {
