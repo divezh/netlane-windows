@@ -1,0 +1,2 @@
+# Patch files are consumed by git apply, including on Windows with core.autocrlf.
+*.patch text eol=lf
