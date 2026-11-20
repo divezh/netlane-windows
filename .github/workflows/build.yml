@@ -25,7 +25,7 @@ env:
   RELEASE_TAG: ${{ inputs.tag || (startsWith(github.ref, 'refs/tags/v') && github.ref_name) || '' }}
 
 jobs:
-  # The routed engine: TrustTunnel Client 1.1.12 built from source with clients/windows/upstream/*.patch.
+  # The routed engine: TrustTunnel Client 1.3.0 built from source with clients/windows/upstream/*.patch.
   # Cached by the patches and the build script, so it is rebuilt only when they change.
   engine:
     runs-on: windows-latest
@@ -55,7 +55,9 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          choco install nasm ninja -y --no-progress
+          choco install nasm ninja make llvm nodejs-lts -y --no-progress
+          python -m pip install 'clang-format>=21,<22'
+          npm install -g markdownlint-cli
           "C:\Program Files\NASM" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
 
       - name: Visual Studio developer shell

@@ -4,7 +4,7 @@ using System.Security.Cryptography;
 
 namespace Netlane {
     internal static class EngineSpec {
-        internal const string Version = "1.1.12";
+        internal const string Version = "1.3.0";
         internal static readonly bool SupportsApplications = false;
         // Bare process-name rules (Clash PROCESS-NAME) need the routed engine built from the routing patch.
         internal static readonly bool SupportsApplicationNames = false;
@@ -28,7 +28,7 @@ namespace Netlane {
             CheckAvailability();
             Held held = new Held();
             try {
-                held.Add(VerifyFile(Executable, "2572f6397ec4a39e018858da593ab278facf9b2e86c7e276753f4845ed78968d"));
+                held.Add(VerifyFile(Executable, "ef91763c9ea5a38bb6aa09f817881af853813bf833f06612755aea428748cce9"));
                 held.Add(VerifyFile(Path.Combine(DirectoryPath, "wintun.dll"), "e5da8447dc2c320edc0fc52fa01885c103de8c118481f683643cacc3220dafce"));
                 return held;
             } catch { held.Dispose(); throw; }
