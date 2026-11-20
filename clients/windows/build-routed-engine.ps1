@@ -40,7 +40,9 @@ try {
     # Git's POSIX link.exe must not shadow Microsoft's linker in Conan/nmake.
     $taskMsvcBin = Split-Path -Parent (Get-Command cl.exe -ErrorAction Stop).Source
     if (!(Test-Path -LiteralPath (Join-Path $taskMsvcBin 'link.exe'))) { throw 'MSVC linker is missing.' }
-    $env:PATH = $taskMsvcBin + ';' + $env:PATH
+    $taskPythonScripts = python -c 'import sysconfig; print(sysconfig.get_path("scripts"))'
+    $taskGitTools = Join-Path $env:ProgramFiles 'Git/usr/bin'
+    $env:PATH = "$taskMsvcBin;$taskPythonScripts;$taskGitTools;" + $env:PATH
     $env:SKIP_VENV = '1'; $env:SKIP_BOOTSTRAP = '1'; $env:PRESET = 'msvc-relwithdebinfo'; $env:TT_CLIENT_VERSION = '1.3.0-netlane.1'
     # Strawberry Perl's Doxygen cannot write under a non-ASCII path (e.g. a folder with an em dash);
     # the docs are not part of the build, so skip it there. CI paths are ASCII and keep the defaults.
@@ -50,10 +52,10 @@ try {
     if ((Test-Path -LiteralPath (Join-Path $taskBuild 'CMakeCache.txt')) -and !(Test-Path -LiteralPath (Join-Path $taskBuild 'build.ninja'))) { Remove-Item -LiteralPath (Join-Path $taskBuild 'CMakeCache.txt') }
     python scripts/bootstrap_conan_deps.py
     if ($LASTEXITCODE -ne 0) { throw 'Conan bootstrap failed.' }
-    make all
+    make SHELL=sh.exe all
     if ($LASTEXITCODE -ne 0) { throw 'Native engine build failed.' }
-    make test
+    make SHELL=sh.exe test
     if ($LASTEXITCODE -ne 0) { throw 'Native engine tests failed.' }
-    make lint
+    make SHELL=sh.exe lint
     if ($LASTEXITCODE -ne 0) { throw 'Native engine lint failed.' }
 } finally { Pop-Location }

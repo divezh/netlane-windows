@@ -28,9 +28,13 @@ try {
     $env:SKIP_BOOTSTRAP = '1'
     $env:PRESET = 'msvc-relwithdebinfo'
     $env:CMAKE_ARGS = '-DCMAKE_DISABLE_FIND_PACKAGE_Doxygen=TRUE'
-    make all; Check 'build'
-    make test; Check 'engine tests'
-    make lint; Check 'engine lint'
+    $msvcBin = Split-Path -Parent (Get-Command cl.exe -ErrorAction Stop).Source
+    $pythonScripts = python -c 'import sysconfig; print(sysconfig.get_path("scripts"))'
+    $gitTools = Join-Path $env:ProgramFiles 'Git/usr/bin'
+    $env:PATH = "$msvcBin;$pythonScripts;$gitTools;" + $env:PATH
+    make SHELL=sh.exe all; Check 'build'
+    make SHELL=sh.exe test; Check 'engine tests'
+    make SHELL=sh.exe lint; Check 'engine lint'
     $build = 'cmake-build-msvc-relwithdebinfo'
     Get-Item "$build/trusttunnel/trusttunnel_client.exe" | Format-List FullName, Length
 } finally { Pop-Location }
