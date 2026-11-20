@@ -40,7 +40,7 @@ try {
     # Git's POSIX link.exe must not shadow Microsoft's linker in Conan/nmake.
     $taskMsvcBin = Split-Path -Parent (Get-Command cl.exe -ErrorAction Stop).Source
     if (!(Test-Path -LiteralPath (Join-Path $taskMsvcBin 'link.exe'))) { throw 'MSVC linker is missing.' }
-    $taskPythonScripts = python -c 'import sysconfig; print(sysconfig.get_path("scripts"))'
+    $taskPythonScripts = python -c "import sysconfig; print(sysconfig.get_path('scripts'))"
     $taskGitTools = Join-Path $env:ProgramFiles 'Git/usr/bin'
     $env:PATH = "$taskMsvcBin;$taskPythonScripts;$taskGitTools;" + $env:PATH
     $env:SKIP_VENV = '1'; $env:SKIP_BOOTSTRAP = '1'; $env:PRESET = 'msvc-relwithdebinfo'; $env:TT_CLIENT_VERSION = '1.3.0-netlane.1'

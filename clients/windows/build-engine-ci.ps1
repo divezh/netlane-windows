@@ -31,7 +31,7 @@ try {
     $env:PRESET = 'msvc-relwithdebinfo'
     $env:CMAKE_ARGS = '-DCMAKE_DISABLE_FIND_PACKAGE_Doxygen=TRUE'
     $msvcBin = Split-Path -Parent (Get-Command cl.exe -ErrorAction Stop).Source
-    $pythonScripts = python -c 'import sysconfig; print(sysconfig.get_path("scripts"))'
+    $pythonScripts = python -c "import sysconfig; print(sysconfig.get_path('scripts'))"
     $gitTools = Join-Path $env:ProgramFiles 'Git/usr/bin'
     $env:PATH = "$msvcBin;$pythonScripts;$gitTools;" + $env:PATH
     make SHELL=sh.exe all; Check 'build'
