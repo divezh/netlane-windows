@@ -123,6 +123,23 @@ jobs:
           & artifacts/windows/Netlane/NetlaneTests.exe
           if ($LASTEXITCODE -ne 0) { throw "Tests failed: $LASTEXITCODE" }
 
+      - name: Build EXE installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $compilerDir = Join-Path $PWD '.tools/inno-setup'
+          New-Item -ItemType Directory -Force $compilerDir | Out-Null
+          $download = Join-Path $compilerDir 'innosetup-6.7.4.exe'
+          Invoke-WebRequest -Uri 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_4/innosetup-6.7.4.exe' -OutFile $download
+          $hash = (Get-FileHash $download -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne 'a549929319f9120716677c685535ca4671e4b937b5fdc87e2585f32d8eb30e8c') { throw 'Inno Setup checksum mismatch' }
+          $signature = Get-AuthenticodeSignature $download
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Pyrsys') { throw 'Inno Setup publisher verification failed' }
+          $compiler = Join-Path $compilerDir 'compiler'
+          $p = Start-Process $download -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', '/NOICONS', '/PORTABLE=1', ('/DIR="' + $compiler + '"')) -WindowStyle Hidden -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Inno Setup extraction failed: $($p.ExitCode)" }
+          ./clients/windows/build-installer.ps1 -IsccPath (Join-Path $compiler 'ISCC.exe')
+
       - name: Screenshots for guides
         shell: pwsh
         run: |
@@ -151,13 +168,17 @@ jobs:
           Copy-Item artifacts/Netlane-windows-x64.zip $zip -Force
           $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  Netlane-windows-x64.zip" | Set-Content "$zip.sha256" -Encoding ASCII
+          Copy-Item artifacts/Netlane-Setup-*-x64.exe dist/
+          Copy-Item artifacts/Netlane-Setup-*-x64.exe.sha256 dist/
           Write-Host "Archive SHA-256: $hash"
 
       - name: Attest build provenance
         if: github.event_name != 'pull_request'
         uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
         with:
-          subject-path: dist/Netlane-windows-x64.zip
+          subject-path: |
+            dist/Netlane-windows-x64.zip
+            dist/Netlane-Setup-*-x64.exe
 
       - name: Upload archive
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
@@ -187,6 +208,7 @@ jobs:
           $notes += "`n`nПодпись владельца: ``openssl dgst -sha256 -verify netlane-release.pub -signature Netlane-windows-x64.zip.sig Netlane-windows-x64.zip``. Происхождение сборки: ``gh attestation verify Netlane-windows-x64.zip --repo $env:GITHUB_REPOSITORY``"
           Set-Content release-notes.md $notes -Encoding UTF8
           $assets = @('dist/Netlane-windows-x64.zip', 'dist/Netlane-windows-x64.zip.sha256')
+          $assets += @(Get-ChildItem dist/Netlane-Setup-* -File | ForEach-Object { $_.FullName })
           # A published release is immutable and already signed: never replace its archive.
           $existing = gh release view $tag --json isDraft --jq .isDraft 2>$null
           if ($LASTEXITCODE -eq 0) {

@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Draft release tag (netlane-X.Y.Z or vX.Y.Z)
+        description: Draft Windows release tag (vX.Y.Z)
         required: true
       signatures:
-        description: 'ASSET=BASE64 pairs separated by spaces, e.g. Netlane-macos.zip=MEUCIQ…'
+        description: 'Both ASSET=BASE64 signatures: Netlane-windows-x64.zip and Netlane-Setup-X.Y.Z-x64.exe'
         required: true
 
 permissions:
@@ -31,14 +31,22 @@ jobs:
       - name: Verify, attach and publish
         run: |
           set -euo pipefail
-          [[ $TAG =~ ^(netlane-|v)[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::bad tag"; exit 1; }
+          [[ $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::bad tag"; exit 1; }
           test "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = true || { echo "::error::$TAG is not a draft"; exit 1; }
           mkdir -p work
+          setup="Netlane-Setup-${TAG#v}-x64.exe"
+          declare -A provided
           for pair in $SIGNATURES; do
             name=${pair%%=*}; value=${pair#*=}
-            [[ $name =~ ^[A-Za-z0-9._-]+$ && $name != *.sig ]] || { echo "::error::bad asset name $name"; exit 1; }
-            gh release download "$TAG" -p "$name" -D work --clobber
+            [[ $name == Netlane-windows-x64.zip || $name == "$setup" ]] || { echo "::error::unexpected asset $name"; exit 1; }
+            [[ -z ${provided[$name]:-} ]] || { echo "::error::duplicate signature $name"; exit 1; }
+            provided[$name]=1
             printf '%s' "$value" | base64 -d > "work/$name.sig"
+          done
+          for name in Netlane-windows-x64.zip "$setup"; do
+            [[ -n ${provided[$name]:-} ]] || { echo "::error::missing signature $name"; exit 1; }
+            gh release download "$TAG" -p "$name" -p "$name.sha256" -D work --clobber
+            (cd work && sha256sum -c "$name.sha256")
             openssl dgst -sha256 -verify netlane-release.pub -signature "work/$name.sig" "work/$name"
           done
           gh release upload "$TAG" work/*.sig --clobber

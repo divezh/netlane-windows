@@ -8,7 +8,15 @@ VPN-клиент на базе [TrustTunnel](https://github.com/TrustTunnel/Trus
 
 ## Установка
 
-Скачайте **[Netlane-windows-x64.zip](https://github.com/divezh/netlane-windows/releases/latest/download/Netlane-windows-x64.zip)**, распакуйте целиком и запустите `Netlane.exe`. Затем «Вставить» → ссылка подписки от администратора → «Подключиться».
+Скачайте **EXE-установщик из [последнего релиза](https://github.com/divezh/netlane-windows/releases/latest)**
+и запустите его: программа и движок устанавливаются вместе, добавляется ярлык
+«Netlane Connect» в меню «Пуск». Затем «Вставить» → ссылка подписки администратора
+→ «Подключиться». Установка для текущего пользователя сохраняет подписки и правила.
+
+Portable-вариант: скачайте
+**[Netlane-windows-x64.zip](https://github.com/divezh/netlane-windows/releases/latest/download/Netlane-windows-x64.zip)**,
+распакуйте целиком и запустите `Netlane.exe`.
+Подробнее: [сборка и поведение установщика](clients/windows/installer/README.md).
 
 Файлы не подписаны Authenticode. Если SmartScreen предупредит, нажмите «Подробнее» → «Выполнить в любом случае». Каждый архив подписан ключом владельца ([`netlane-release.pub`](netlane-release.pub), SHA-256 ключа `8c6ed42d…8a8136`); приложение ставит обновления только с этой подписью. Проверка вручную:
 
@@ -30,7 +38,10 @@ powershell -ExecutionPolicy Bypass -File .\clients\windows\fix-other-vpn.ps1
 
 Правило программы — имя файла, например `chrome.exe`, или полный путь к нему. В панели те же правила действуют и на Mac: там `Google Chrome.exe` означает процесс `Google Chrome` вместе с его Helper-процессами.
 
-**Удаление:** значок в трее → «Выход», затем удалите папку с программой и `%LOCALAPPDATA%\Netlane`. Если был включён автозапуск:
+**Удаление:** значок в трее → «Выход», затем «Параметры Windows → Приложения →
+Netlane Connect → Удалить». Подписки и правила сохраняются в
+`%LOCALAPPDATA%\Netlane`; удалите эту папку отдельно, если они больше не нужны.
+Для portable-копии удалите папку с программой. Если остался её автозапуск:
 
 ```powershell
 Remove-ItemProperty HKCU:\Software\Microsoft\Windows\CurrentVersion\Run -Name Netlane -ErrorAction SilentlyContinue
