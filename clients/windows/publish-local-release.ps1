@@ -22,9 +22,26 @@ foreach ($taskName in $taskNames) {
 }
 $taskTests = Join-Path $taskRoot 'artifacts/windows/Netlane/NetlaneTests.exe'
 if (-not (Test-Path -LiteralPath $taskTests)) { throw 'Build the Windows client before publishing.' }
-Write-Output 'Running the complete Windows client tests before publication...'
-& $taskTests
-if ($LASTEXITCODE -ne 0) { throw 'Client tests failed. Nothing has been published.' }
+$taskTestTemp = Join-Path $taskRoot ('.tools/release-tests/' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $taskTestTemp -Force | Out-Null
+$taskProbe = Join-Path $taskTestTemp 'write-check.txt'
+[IO.File]::WriteAllText($taskProbe, 'Netlane release test workspace')
+Remove-Item -LiteralPath $taskProbe -Force
+$taskIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$taskElevated = ([Security.Principal.WindowsPrincipal]::new($taskIdentity)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+Write-Output "Running the complete Windows client tests; elevated=$taskElevated; TEMP=$taskTestTemp"
+$taskOldTemp = $env:TEMP
+$taskOldTmp = $env:TMP
+try {
+    $env:TEMP = $taskTestTemp
+    $env:TMP = $taskTestTemp
+    & $taskTests
+    $taskTestExit = $LASTEXITCODE
+} finally {
+    $env:TEMP = $taskOldTemp
+    $env:TMP = $taskOldTmp
+}
+if ($taskTestExit -ne 0) { throw 'Client tests failed. Nothing has been published. Test files remain under .tools/release-tests for diagnosis.' }
 $taskStatus = & git status --porcelain
 if ($LASTEXITCODE -ne 0 -or $taskStatus) { throw 'Commit the reviewed release sources before publication.' }
 & gh api user --jq .login
