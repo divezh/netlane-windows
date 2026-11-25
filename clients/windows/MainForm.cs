@@ -32,6 +32,24 @@ namespace Netlane {
         readonly Panel side, pageHost, homePage, sessionPane, errorPane, emptyHost;
         readonly List<NavItem> nav = new List<NavItem>();
         Label footerNote;
+        readonly LinkLabel applySettings = new LinkLabel { Text = "Новые настройки · Переподключиться и применить", AutoSize = true, Visible = false, Anchor = AnchorStyles.Left, LinkColor = Theme.Accent };
+        string startedSettings, attemptTransport, previousTransport, attemptServer;
+        readonly Dictionary<string, string> lastAttempt = new Dictionary<string, string>();
+        void RecordAttempt(string outcome) {
+            if (attemptServer != null) lastAttempt[attemptServer] = AttemptPath + " · " + outcome;
+        }
+        bool settingsPending;
+        static string NetworkSettings(Profile profile) {
+            return profile.Routing.EngineConfig() + "\n" + String.Join("\n", profile.DnsServers);
+        }
+        void CaptureAttempt(Profile profile) {
+            attemptServer = state.SelectedServerId;
+            startedSettings = NetworkSettings(profile);
+            attemptTransport = profile.Protocol == "http3" ? "HTTP/3" : "HTTP/2";
+        }
+        string AttemptPath {
+            get { return previousTransport == null ? attemptTransport : previousTransport + " не подключился → " + attemptTransport; }
+        }
         readonly Label clock = ValueLabel(), speed = ValueLabel(), sent = ValueLabel(), received = ValueLabel(), dnsValue = ValueLabel();
         readonly Label graphPeak = TextLabel("", Theme.CaptionSize, Theme.Faint);
         readonly Label errorDetail = TextLabel("", Theme.BodySize, Theme.Muted), emptyTitle = TextLabel("", 20f, Theme.Ink), emptySub = TextLabel("", Theme.BodySize, Theme.Muted), emptyHint = TextLabel("Один сервер по ссылке tt:// тоже подойдёт", Theme.CaptionSize, Theme.Faint);
@@ -264,6 +282,12 @@ namespace Netlane {
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             Label version = new Label { Text = "v" + Program.Version, AutoSize = true, Font = Theme.Font(Theme.CaptionSize), ForeColor = Theme.Faint, Anchor = AnchorStyles.Left, Margin = new Padding(0) };
             footerNote = new Label { Text = "Профиль зашифрован Windows", AutoSize = true, Font = Theme.Font(Theme.CaptionSize), ForeColor = Theme.Faint, Anchor = AnchorStyles.Right, Margin = new Padding(0) };
+            footer.Controls.Add(applySettings, 1, 0);
+            applySettings.LinkClicked += async delegate {
+                if (view != ConnectionView.Connected || busy || switching) return;
+                reapplyPending = true; reapplyLabel = "новые настройки";
+                await SwitchTo(null, null);
+            };
             footer.Controls.Add(version, 0, 0); footer.Controls.Add(footerNote, 2, 0);
 
             homePage.Controls.Add(normalView); homePage.Controls.Add(emptyHost); homePage.Controls.Add(footer);
@@ -631,7 +655,10 @@ namespace Netlane {
             FeedResult result = state.ApplyFeed(sub.Id, feed, ConnectedServerId);
             subscriptionAttempts[sub.Id] = DateTime.UtcNow;
             SaveState(); RefreshState();
-            if (result.SettingsChanged) Note("Правила и DNS подписки обновлены. Применятся при следующем подключении.");
+            if (result.SettingsChanged && Selected != null && startedSettings != null) {
+                settingsPending = startedSettings != NetworkSettings(state.SessionProfile());
+                ControlsEnabled();
+            }
             // New credentials of the server in use: one reconnect, like a rule change.
             if (result.CurrentChanged && connection.Active) { reapplyPending = true; SwitchTo(null, null); }
         }
@@ -850,7 +877,7 @@ namespace Netlane {
         }
         // «Авто»: watches the start; HTTP/3 that does not connect in 15 s (or fails) gives way to HTTP/2, once.
         void BeginAuto(bool fallback) {
-            if (!fallback) autoFellBack = false;
+            if (!fallback) { autoFellBack = false; previousTransport = null; }
             Server server = Selected;
             autoAttempt = server != null && server.AutoTransport ? server.EffectiveProtocol : null;
             int generation = ++autoGeneration;
@@ -865,7 +892,7 @@ namespace Netlane {
             Server server = Selected;
             if (autoAttempt == null || autoFellBack || server == null || !server.AutoTransport || previewOnly) return false;
             string other = autoAttempt == "http3" ? "http2" : "http3";
-            autoFellBack = true; autoGeneration++;
+            previousTransport = attemptTransport; autoFellBack = true; autoGeneration++;
             server.AutoProtocol = other; SaveState();
             EngineLog.Write("auto transport: " + autoAttempt + " did not connect, trying " + other);
             FallBack(other);
@@ -922,11 +949,13 @@ namespace Netlane {
                         while (switchPending) { try { TakePending(); } catch (FormatException) { } }
                         SaveState();
                         BeginAuto(false);
-                        await connection.StartAsync(state.SessionProfile(), true, 0);
+                        Profile nextProfile = state.SessionProfile();
+                        CaptureAttempt(nextProfile);
+                        await connection.StartAsync(nextProfile, true, 0);
                     } catch (Exception error) { DropPending(); EngineLog.Write("switch failed: " + error); Error("Не удалось переключиться: " + error.Message); return; }
                     finally { busy = false; ControlsEnabled(); }
                 }
-            } finally { switching = false; }
+            } finally { switching = false; ControlsEnabled(); }
         }
 
         // Session time and, in TUN mode, traffic of the VPN adapter; unreadable counters only hide the traffic.
@@ -989,7 +1018,11 @@ namespace Netlane {
             string ping; pings.TryGetValue(server == null ? "" : server.Id, out ping);
             string place = server == null ? "" : server.Name + " · " + transport;
             string subtitle;
-            if (view == ConnectionView.Error) subtitle = server == null ? "Проверьте доступ и настройки" : place;
+            string last;
+            if (view == ConnectionView.Idle && server != null && lastAttempt.TryGetValue(server.Id, out last))
+                subtitle = server.Name + " · Последняя попытка: " + last;
+            else if (view == ConnectionView.Connected && server != null && previousTransport != null) subtitle = server.Name + " · " + AttemptPath + " подключён";
+            else if (view == ConnectionView.Error) subtitle = server == null ? "Проверьте доступ и настройки" : place;
             else if (!String.IsNullOrEmpty(stateNote)) subtitle = stateNote;
             else if (view == ConnectionView.NoProfile) {
                 // A subscription that gives no servers says why, instead of «add a server».
@@ -1069,6 +1102,8 @@ namespace Netlane {
             for (int i = 0; i < demo.Length; i++) speedGraph.Push(demo[i] * 1024 * 1024 * (0.55 + 0.45 * Math.Abs(Math.Sin(i * 1.7))), (90 + 70 * Math.Abs(Math.Cos(i * 1.3)) + (i % 11 == 4 ? 260 : 0)) * 1024);
         }
         void ControlsEnabled() {
+            applySettings.Visible = settingsPending && view == ConnectionView.Connected;
+            applySettings.Enabled = !busy && !switching;
             bool hasServer = Selected != null;
             connectButton.Enabled = !busy && (hasServer || connection.Active) && Theme.ForState(view).RingEnabled;
             table.Enabled = !busy;
@@ -1178,9 +1213,10 @@ namespace Netlane {
             Profile session;
             try { session = state.SessionProfile(); } catch (FormatException error) { Error(error.Message); return; }
             if (session.Routing.Applications.Count > 0 && !EngineSpec.SupportsApplications) { Error("Эта сборка не поддерживает правила приложений. Используйте полный комплект Netlane Connect."); return; }
+            CaptureAttempt(session);
             string startedServer = state.SelectedServerId, startedSet = state.SelectedRuleSet.Id;
             busy = true; failed = false; accessDenied = false; reconnectAttempts = 0; retrySeconds = 0; ApplyView(ConnectionView.Connecting, null, "Подтвердите запрос Windows на запуск VPN."); ControlsEnabled();
-            try { await connection.StartAsync(session, true, 0); Note("Ожидаем подтверждения от VPN-сервера…"); }
+            try { await connection.StartAsync(session, true, 0); if (view == ConnectionView.Connecting) Note("Ожидаем подтверждения от VPN-сервера…"); }
             catch (System.ComponentModel.Win32Exception error) { Error(error.NativeErrorCode == 1223 ? "Запрос прав администратора отменён. VPN не включён." : "Не удалось запустить VPN. Распакуйте приложение заново."); }
             catch (Exception error) { EngineLog.Write("connect failed: " + error); Error("Не удалось запустить движок: " + error.Message); }
             finally { busy = false; ControlsEnabled(); }
@@ -1192,13 +1228,16 @@ namespace Netlane {
             if (IsDisposed || !IsHandleCreated) return;
             BeginInvoke((Action)delegate {
                 if (IsDisposed) return;
-                if (engineState == "CONNECTED") { if (autoAttempt != null && Selected != null && Selected.AutoTransport) { Selected.AutoProtocol = autoAttempt; SaveState(); } autoAttempt = null; autoGeneration++; CheckIp(2000); failed = false; accessDenied = false; tunnelWarning = null; retrySeconds = 0; ApplyView(ConnectionView.Connected, null, ""); connectedAt = DateTime.UtcNow; traffic = new TrafficMeter(new AdapterTraffic()); traffic.Start(); UpdateSession(); timer.Start(); tray.Text = Program.ProductName + " · Подключено"; TrackTunnel(); if (announceSwitch && Selected != null) trayMenu.Notify(Program.ProductName, "Подключено: " + Selected.Name); announceSwitch = false; }
+                if (engineState == "CONNECTED") { RecordAttempt("подключено"); if (Selected != null && startedSettings != null) settingsPending = startedSettings != NetworkSettings(state.SessionProfile()); if (autoAttempt != null && Selected != null && Selected.AutoTransport) { Selected.AutoProtocol = autoAttempt; SaveState(); } autoAttempt = null; autoGeneration++; CheckIp(2000); failed = false; accessDenied = false; tunnelWarning = null; retrySeconds = 0; ApplyView(ConnectionView.Connected, null, ""); connectedAt = DateTime.UtcNow; traffic = new TrafficMeter(new AdapterTraffic()); traffic.Start(); UpdateSession(); timer.Start(); tray.Text = Program.ProductName + " · Подключено"; TrackTunnel(); if (announceSwitch && Selected != null) trayMenu.Notify(Program.ProductName, "Подключено: " + Selected.Name); announceSwitch = false; }
                 else if (engineState.StartsWith("RECONNECTING")) { reconnectAttempts++; if (reconnectAttempts == 1) trayMenu.Notify(Program.ProductName, "Соединение потеряно, переподключаюсь"); int pause = 5; Int32.TryParse(engineState.IndexOf(':') >= 0 ? engineState.Substring(engineState.IndexOf(':') + 1) : "", out pause); retrySeconds = pause > 0 ? pause : 5; ApplyView(ConnectionView.Reconnecting, null, "Переподключение: попытка " + reconnectAttempts + " через " + retrySeconds + " с"); timer.Start(); tray.Text = Program.ProductName + " · Переподключение"; }
-                else if (engineState == "ACCESS_DENIED") { accessDenied = true; Error(AccessDeniedText); tray.Text = Program.ProductName + " · Доступ закрыт"; }
+                else if (engineState == "ACCESS_DENIED") { RecordAttempt("сервер отклонил доступ"); accessDenied = true; Error(AccessDeniedText); tray.Text = Program.ProductName + " · Доступ закрыт"; }
                 else if (engineState == "KILL_SWITCH_ACTIVE") { failed = true; timer.Stop(); ApplyView(ConnectionView.KillSwitch, null, accessDenied ? "Доступ закрыт сервером. Нажмите «Отключиться», чтобы вернуть интернет." : "Нажмите «Отключиться», чтобы снять блокировку интернета."); tray.Text = Program.ProductName + " · Kill Switch"; trayMenu.Notify(Program.ProductName, accessDenied ? "Доступ закрыт сервером. Интернет заблокирован Kill Switch." : "Интернет заблокирован: Kill Switch удерживает защиту"); }
                 else if ((engineState == "CONNECTION_ERROR" || engineState == "WORKER_ERROR") && accessDenied) { }
                 else if ((engineState == "CONNECTION_ERROR" || engineState == "WORKER_ERROR") && StartFallback()) { }
-                else if (engineState == "CONNECTION_ERROR" || engineState == "WORKER_ERROR" || engineState == "ADMIN_REQUIRED") Error("Соединение не установлено. Проверьте доступ, срок, квоту и выбранный транспорт.");
+                else if (engineState == "CONNECTION_ERROR" || engineState == "WORKER_ERROR" || engineState == "ADMIN_REQUIRED") {
+                    RecordAttempt(engineState == "ADMIN_REQUIRED" ? "нужны права администратора" : engineState == "WORKER_ERROR" ? "ошибка движка" : "соединение не установлено");
+                    Error(engineState == "ADMIN_REQUIRED" ? "Для запуска VPN нужны права администратора." : AttemptPath + " — " + (engineState == "WORKER_ERROR" ? "ошибка запуска движка." : "соединение не установлено."));
+                }
                 else if (engineState == "STOP_FAILED") Error("VPN не подтвердил остановку. Дождитесь завершения, прежде чем выходить.");
                 else if (engineState == "STOPPED") { if (!switching) { DropOrphans(); RememberSession(); CheckIp(2000); } timer.Stop(); connectedAt = DateTime.MinValue; traffic = null; tunnelCheck++; tunnelWarning = null; retrySeconds = 0; reconnectAttempts = 0; if (!failed && !switching) ApplyView(Selected == null ? ConnectionView.NoProfile : ConnectionView.Idle, null, "VPN остановлен."); if (!switching) tray.Text = Program.ProductName + " · Не подключено"; }
                 ControlsEnabled();
