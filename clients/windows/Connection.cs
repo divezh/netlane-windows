@@ -122,6 +122,20 @@ namespace Netlane {
         internal static bool IsAdmin() { return new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator); }
     }
     internal static class Worker {
+        const string SessionConfigName = "session.toml";
+
+        internal static ProcessStartInfo CreateEngineStartInfo(string sessionDirectory) {
+            // Windows passes the working directory as Unicode. The engine's narrow argv
+            // only needs the ASCII filename, even when the user's temp path contains Unicode.
+            return new ProcessStartInfo(EngineSpec.Executable, "--config " + SessionConfigName) {
+                WorkingDirectory = sessionDirectory,
+                UseShellExecute = false,
+                CreateNoWindow = false,
+                WindowStyle = ProcessWindowStyle.Hidden,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true
+            };
+        }
         static readonly Regex LogLevel = new Regex(@"\A\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2}\.\d+ (TRACE|DEBUG|INFO|WARN|ERROR)\s");
         // Engine log lines carry a level. Only ERROR lines can mean a failed connection: INFO and WARN
         // lines also say "Failed to" for routine events, e.g. DNS sent directly in selective mode.
@@ -181,14 +195,14 @@ namespace Netlane {
                         acl.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null), FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
                         directory = Path.Combine(Path.GetTempPath(), "Netlane-" + Guid.NewGuid().ToString("N"));
                         Directory.CreateDirectory(directory, acl);
-                        string config = Path.Combine(directory, "session.toml");
+                        string config = Path.Combine(directory, SessionConfigName);
                         string configText = request.Profile.EngineConfig(request.SocksPort);
                         File.WriteAllText(config, configText, new UTF8Encoding(false));
                         EngineLog.Write("session.toml (password masked):\n" + EngineLog.Mask(configText));
                         // The session must be able to reach its endpoint even when another VPN owns
                         // the default route; the exception is removed when the engine exits.
                         RouteException.Add(request.Profile);
-                        engine = new Process { StartInfo = new ProcessStartInfo(EngineSpec.Executable, "--config \"" + config + "\"") { WorkingDirectory = EngineSpec.DirectoryPath, UseShellExecute = false, CreateNoWindow = false, WindowStyle = ProcessWindowStyle.Hidden, RedirectStandardError = true, RedirectStandardOutput = true } };
+                        engine = new Process { StartInfo = CreateEngineStartInfo(directory) };
                         DataReceivedEventHandler observe = delegate(object sender, DataReceivedEventArgs args) {
                             string line = args.Data;
                             if (line == null) return;
@@ -231,7 +245,7 @@ namespace Netlane {
                         while (!engine.WaitForExit(1000)) send("STOP_FAILED");
                     }
                     if (!started || engine.HasExited) {
-                        if (directory != null) { try { File.Delete(Path.Combine(directory, "session.toml")); Directory.Delete(directory); } catch (IOException) {} }
+                        if (directory != null) { try { File.Delete(Path.Combine(directory, SessionConfigName)); Directory.Delete(directory); } catch (IOException) {} }
                     }
                     if (engine != null) engine.Dispose();
                     if (engineFiles != null) engineFiles.Dispose();

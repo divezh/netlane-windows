@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -714,6 +715,32 @@ namespace Netlane {
                 EngineSpec.CheckAvailability(directory);
             } finally {Directory.Delete(directory,true);}
         }
+        static void UnicodeSessionPathTest() {
+            string root = TempDir();
+            string directory = Path.Combine(root, "Профиль Windows");
+            string config = Path.Combine(directory, "session.toml");
+            try {
+                Directory.CreateDirectory(directory);
+                File.WriteAllText(config, "[endpoint]\n" + Fixture, new UTF8Encoding(false));
+                ProcessStartInfo start = Worker.CreateEngineStartInfo(directory);
+                // Exercise the shipped engine's file reader without opening a tunnel.
+                start.Arguments += " --export-deeplink";
+                using (Process engine = Process.Start(start)) {
+                    if (!engine.WaitForExit(10000)) {
+                        engine.Kill();
+                        engine.WaitForExit();
+                        throw new Exception("Engine configuration check timed out.");
+                    }
+                    string errors = engine.StandardError.ReadToEnd();
+                    Check(engine.ExitCode == 0 && engine.StandardOutput.ReadToEnd().Trim().StartsWith("tt://", StringComparison.Ordinal),
+                        "Engine must read session.toml from a Unicode working directory. " + errors);
+                }
+            } finally {
+                File.Delete(config);
+                Directory.Delete(directory);
+                Directory.Delete(root);
+            }
+        }
         static void ConnectionDisposeTests() {
             Connection c = new Connection();
             StreamWriter broken = new StreamWriter(new BrokenPipeStream(), new UTF8Encoding(false), 4096, false);
@@ -1068,6 +1095,7 @@ namespace Netlane {
                 EngineAvailabilityTests();
                 ConnectionDisposeTests();
                 EngineSpec.Verify();
+                UnicodeSessionPathTest();
                 Routing routes=new Routing();routes.Destinations.Add("*.Example.COM");routes.Destinations.Add("10.0.0.0/8");routes.Validate();Check(routes.Destinations[0]=="*.example.com","Domain normalization failed.");
                 foreach(string bad in new[]{"https://example.com","example.com:443","10.0.0.1/33","2001:db8::/129","2001:db8::1","a b.com","1","..example.com","010.0.0.1","256.1.1.1"}){bool rejected=false;try{Routing.NormalizeDestination(bad);}catch(FormatException){rejected=true;}Check(rejected,"Unsafe routing destination accepted.");}
                 routes.Applications.Add(new AppRule{Executable=@"C:\Apps\browser.exe",Action="direct"});routes.Validate();Check(routes.EngineConfig().Contains("[[application_rules]]"),"Application rule not emitted.");
